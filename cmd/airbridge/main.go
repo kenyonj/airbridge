@@ -6,12 +6,19 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kenyonj/airbridge/internal/discovery"
+	"github.com/kenyonj/airbridge/internal/httpserver"
+	"github.com/kenyonj/airbridge/internal/player"
+	"github.com/kenyonj/airbridge/internal/ssdp"
+	"github.com/kenyonj/airbridge/internal/state"
 	"github.com/kenyonj/airbridge/pkg/raop"
 )
 
@@ -19,6 +26,9 @@ func main() {
 	// Parse flags
 	version := flag.Bool("version", false, "Print version")
 	testStream := flag.String("test", "", "Test streaming to device (by name or IP:port)")
+	serve := flag.Bool("serve", false, "Run as DLNA renderer server")
+	target := flag.String("target", "", "Target AirPlay device name (for serve mode)")
+	port := flag.Int("port", 8200, "HTTP port for DLNA server")
 	flag.Parse()
 
 	fmt.Println("Airbridge - DLNA to AirPlay Bridge")
@@ -41,6 +51,12 @@ func main() {
 		fmt.Println("\nShutting down...")
 		cancel()
 	}()
+
+	// DLNA server mode
+	if *serve {
+		runDLNAServer(ctx, *target, *port)
+		return
+	}
 
 	// Start discovery
 	disco := discovery.NewService()
@@ -159,4 +175,119 @@ func generateTone(frequency float64, durationSec int) []byte {
 		buf[offset+3] = byte(value >> 8)
 	}
 	return buf
+}
+
+// runDLNAServer starts the DLNA renderer server.
+func runDLNAServer(ctx context.Context, targetDevice string, httpPort int) {
+	fmt.Printf("Starting DLNA renderer server on port %d\n", httpPort)
+
+	// Start device discovery
+	disco := discovery.NewService()
+	if err := disco.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start discovery: %v\n", err)
+		os.Exit(1)
+	}
+	defer disco.Stop()
+
+	// Wait for discovery
+	fmt.Println("Waiting for AirPlay device discovery...")
+	time.Sleep(5 * time.Second)
+
+	// Find the target device
+	var device *discovery.AirPlayDevice
+	if targetDevice != "" {
+		device = disco.GetDeviceByName(targetDevice)
+		if device == nil {
+			fmt.Fprintf(os.Stderr, "Target device not found: %s\n", targetDevice)
+			fmt.Println("Available devices:")
+			for _, d := range disco.GetDevices() {
+				fmt.Printf("  - %s (%s:%d)\n", d.Name, d.Host, d.Port)
+			}
+			os.Exit(1)
+		}
+		fmt.Printf("Target device: %s at %s:%d\n", device.Name, device.Host, device.Port)
+	}
+
+	// Get local IP
+	ip := getLocalIP()
+	if ip == "" {
+		fmt.Fprintln(os.Stderr, "Could not determine local IP address")
+		os.Exit(1)
+	}
+
+	baseURL := fmt.Sprintf("http://%s:%d", ip, httpPort)
+	deviceUUID := uuid.New().String()
+	serverName := "Airbridge/1.0"
+	friendlyName := "Airbridge"
+	if device != nil {
+		friendlyName = fmt.Sprintf("Airbridge (%s)", device.Name)
+	}
+
+	fmt.Printf("Device UUID: %s\n", deviceUUID)
+	fmt.Printf("Base URL: %s\n", baseURL)
+	fmt.Printf("Friendly Name: %s\n", friendlyName)
+	fmt.Println()
+
+	// Create state
+	st := state.New(ctx)
+	defer st.Stop()
+
+	// Create player
+	var audioPlayer interface {
+		Play(ctx context.Context, uri string, volume int) error
+		Pause(ctx context.Context) error
+		Stop(ctx context.Context) error
+		SetVolume(ctx context.Context, volume int) error
+	}
+
+	if device != nil {
+		audioPlayer = player.NewRAOPPlayer(device)
+	} else {
+		fmt.Println("No target device specified, using NullPlayer")
+		audioPlayer = player.NullPlayer{}
+	}
+
+	// Setup HTTP server
+	mux := http.NewServeMux()
+	httpserver.RegisterHTTP(mux, baseURL, deviceUUID, friendlyName, "Airbridge", st, audioPlayer)
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", httpPort),
+		Handler: httpserver.LogMiddleware(mux),
+	}
+
+	// Start SSDP
+	go ssdp.Announce(ctx, baseURL, "uuid:"+deviceUUID, serverName)
+	go ssdp.SearchResponder(ctx, baseURL, "uuid:"+deviceUUID, serverName)
+
+	// Start HTTP server
+	go func() {
+		fmt.Printf("HTTP server listening on port %d\n", httpPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "HTTP server error: %v\n", err)
+		}
+	}()
+
+	fmt.Println()
+	fmt.Println("DLNA renderer is running!")
+	fmt.Println("Cast audio to this device from any DLNA/UPnP controller.")
+	fmt.Println("Press Ctrl+C to stop.")
+	fmt.Println()
+
+	// Wait for shutdown
+	<-ctx.Done()
+	srv.Shutdown(context.Background())
+	fmt.Println("Goodbye!")
+}
+
+// getLocalIP returns the preferred local IP address.
+func getLocalIP() string {
+	// Try to find a local IP by connecting to a remote address
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
 }
