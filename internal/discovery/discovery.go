@@ -153,7 +153,8 @@ func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *AirPlayDevice {
 	}
 
 	deviceID := parts[0]
-	friendlyName := parts[1]
+	// Clean up backslash escapes from mDNS names
+	friendlyName := cleanMDNSName(parts[1])
 
 	// Parse TXT record
 	txtRecord := make(map[string]string)
@@ -209,6 +210,14 @@ func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *AirPlayDevice {
 // String returns a human-readable representation of the device.
 func (d *AirPlayDevice) String() string {
 	return fmt.Sprintf("%s (%s) at %s:%d [%s]", d.Name, d.DeviceID, d.Host, d.Port, d.Model)
+}
+
+// cleanMDNSName removes backslash escapes from mDNS names.
+func cleanMDNSName(name string) string {
+	// mDNS escapes spaces and special chars with backslashes
+	result := strings.ReplaceAll(name, "\\ ", " ")
+	result = strings.ReplaceAll(result, "\\", "")
+	return result
 }
 
 // EncryptionTypes returns the encryption types supported by the device.
