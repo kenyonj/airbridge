@@ -20,7 +20,7 @@ type Player interface {
 }
 
 // AVTransportHandler handles AVTransport SOAP requests.
-func AVTransportHandler(st *state.PlayerState, player Player) http.HandlerFunc {
+func AVTransportHandler(st *state.PlayerState, player Player, em *EventManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := st.Context()
 		action := ParseSOAPAction(r.Header.Get("SOAPACTION"))
@@ -55,12 +55,15 @@ func AVTransportHandler(st *state.PlayerState, player Player) http.HandlerFunc {
 			// Start playback asynchronously
 			go func() {
 				st.SetTransportState(state.StateTransition)
+				em.NotifyTransportState(string(state.StateTransition))
 				if err := player.Play(ctx, uri, st.GetVolume()); err != nil {
 					log.Printf("Play error: %v", err)
 					st.SetTransportState(state.StateStopped)
+					em.NotifyTransportState(string(state.StateStopped))
 					return
 				}
 				st.SetTransportState(state.StatePlaying)
+				em.NotifyTransportState(string(state.StatePlaying))
 			}()
 			WriteSOAPResponse(w, AVTransportType, "PlayResponse", "")
 
@@ -74,6 +77,7 @@ func AVTransportHandler(st *state.PlayerState, player Player) http.HandlerFunc {
 					log.Printf("Pause error: %v", err)
 				}
 				st.SetTransportState(state.StatePaused)
+				em.NotifyTransportState(string(state.StatePaused))
 			}()
 			WriteSOAPResponse(w, AVTransportType, "PauseResponse", "")
 
@@ -87,6 +91,7 @@ func AVTransportHandler(st *state.PlayerState, player Player) http.HandlerFunc {
 					log.Printf("Stop error: %v", err)
 				}
 				st.SetTransportState(state.StateStopped)
+				em.NotifyTransportState(string(state.StateStopped))
 				st.ReleaseSession()
 			}()
 			WriteSOAPResponse(w, AVTransportType, "StopResponse", "")
@@ -248,14 +253,85 @@ func ConnectionManagerHandler() http.HandlerFunc {
 	}
 }
 
-// EventHandler handles UPnP event subscriptions (stub).
-func EventHandler(w http.ResponseWriter, r *http.Request) {
-	// UPnP eventing is complex; for now just accept subscriptions
-	if r.Method == "SUBSCRIBE" {
-		w.Header().Set("SID", "uuid:event-subscription-1")
-		w.Header().Set("TIMEOUT", "Second-1800")
-		w.WriteHeader(200)
-		return
+// EventHandlerFor creates an event handler for a specific service.
+func EventHandlerFor(em *EventManager, serviceID string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "SUBSCRIBE":
+			// Check if this is a renewal (has SID header)
+			if sid := r.Header.Get("SID"); sid != "" {
+				// Renewal - just return OK with same SID
+				w.Header().Set("SID", sid)
+				w.Header().Set("TIMEOUT", "Second-1800")
+				w.WriteHeader(200)
+				log.Printf("Event subscription renewed: SID=%s", sid)
+				return
+			}
+			// New subscription
+			sid, timeout, err := em.Subscribe(r, serviceID)
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
+			w.Header().Set("SID", sid)
+			w.Header().Set("TIMEOUT", fmt.Sprintf("Second-%d", timeout))
+			w.WriteHeader(200)
+
+		case "UNSUBSCRIBE":
+			sid := r.Header.Get("SID")
+			if sid != "" {
+				em.Unsubscribe(sid)
+			}
+			w.WriteHeader(200)
+
+		default:
+			w.WriteHeader(405)
+		}
 	}
-	w.WriteHeader(200)
+}
+
+// EventHandlerWithState creates an event handler that sends initial state on subscribe.
+func EventHandlerWithState(em *EventManager, serviceID string, st *state.PlayerState) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "SUBSCRIBE":
+			// Check if this is a renewal (has SID header)
+			if sid := r.Header.Get("SID"); sid != "" {
+				// Renewal - just return OK with same SID
+				w.Header().Set("SID", sid)
+				w.Header().Set("TIMEOUT", "Second-1800")
+				w.WriteHeader(200)
+				log.Printf("Event subscription renewed: SID=%s", sid)
+				return
+			}
+			// New subscription
+			sid, timeout, err := em.Subscribe(r, serviceID)
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
+			w.Header().Set("SID", sid)
+			w.Header().Set("TIMEOUT", fmt.Sprintf("Second-%d", timeout))
+			w.WriteHeader(200)
+
+			// Send initial state event asynchronously
+			go func() {
+				if serviceID == "avtransport" {
+					em.NotifyTransportState(string(st.GetTransportState()))
+				} else if serviceID == "renderingcontrol" {
+					em.NotifyVolume(st.GetVolume(), st.GetMute())
+				}
+			}()
+
+		case "UNSUBSCRIBE":
+			sid := r.Header.Get("SID")
+			if sid != "" {
+				em.Unsubscribe(sid)
+			}
+			w.WriteHeader(200)
+
+		default:
+			w.WriteHeader(405)
+		}
+	}
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/kenyonj/airbridge/internal/renderer"
 	"github.com/kenyonj/airbridge/internal/ssdp"
 	"github.com/kenyonj/airbridge/internal/state"
+	"github.com/kenyonj/airbridge/internal/upnp"
 	"github.com/kenyonj/airbridge/pkg/config"
 	"github.com/kenyonj/airbridge/pkg/raop"
 )
@@ -273,8 +274,9 @@ func runDLNAServer(ctx context.Context, targetDevice string, httpPort int) {
 	}
 
 	// Setup HTTP server
+	em := upnp.NewEventManager()
 	mux := http.NewServeMux()
-	httpserver.RegisterHTTP(mux, baseURL, deviceUUID, friendlyName, "Airbridge", st, audioPlayer)
+	httpserver.RegisterHTTP(mux, baseURL, deviceUUID, friendlyName, "Airbridge", st, audioPlayer, em)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", httpPort),

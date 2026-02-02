@@ -11,7 +11,7 @@ import (
 )
 
 // RegisterHTTP sets up the HTTP routes for UPnP services.
-func RegisterHTTP(mux *http.ServeMux, baseURL, deviceUUID, friendlyName, manufacturer string, st *state.PlayerState, player upnp.Player) {
+func RegisterHTTP(mux *http.ServeMux, baseURL, deviceUUID, friendlyName, manufacturer string, st *state.PlayerState, player upnp.Player, em *upnp.EventManager) {
 	// Device description
 	mux.HandleFunc("/device.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
@@ -33,14 +33,14 @@ func RegisterHTTP(mux *http.ServeMux, baseURL, deviceUUID, friendlyName, manufac
 	})
 
 	// Service control endpoints
-	mux.HandleFunc("/upnp/control/avtransport", upnp.AVTransportHandler(st, player))
+	mux.HandleFunc("/upnp/control/avtransport", upnp.AVTransportHandler(st, player, em))
 	mux.HandleFunc("/upnp/control/renderingcontrol", upnp.RenderingControlHandler(st, player))
 	mux.HandleFunc("/upnp/control/connectionmanager", upnp.ConnectionManagerHandler())
 
-	// Event endpoints
-	mux.HandleFunc("/upnp/event/avtransport", upnp.EventHandler)
-	mux.HandleFunc("/upnp/event/renderingcontrol", upnp.EventHandler)
-	mux.HandleFunc("/upnp/event/connectionmanager", upnp.EventHandler)
+	// Event endpoints - pass state so we can send initial events
+	mux.HandleFunc("/upnp/event/avtransport", upnp.EventHandlerWithState(em, "avtransport", st))
+	mux.HandleFunc("/upnp/event/renderingcontrol", upnp.EventHandlerWithState(em, "renderingcontrol", st))
+	mux.HandleFunc("/upnp/event/connectionmanager", upnp.EventHandlerFor(em, "connectionmanager"))
 
 	// Root
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -184,16 +184,19 @@ func (p *RAOPPlayer) stopInternal() {
 }
 
 // SetVolume adjusts the volume.
+// Note: RAOP volume is set at connection time. Changes take effect on next Play.
 func (p *RAOPPlayer) SetVolume(ctx context.Context, volume int) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	log.Printf("RAOP SetVolume: %d", volume)
+	log.Printf("RAOP SetVolume: %d (will apply on next stream)", volume)
 	p.volume = volume
-
-	// Note: Changing volume mid-stream would require restarting cliraop
-	// For now, just record the value for the next Play call
-
+	
+	// TODO: cliraop doesn't support dynamic volume changes.
+	// Would need to either:
+	// 1. Fork cliraop to add 'v' command to interactive mode
+	// 2. Build native Go RAOP client with SET_PARAMETER support
+	
 	return nil
 }
 

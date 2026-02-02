@@ -15,6 +15,7 @@ import (
 	"github.com/kenyonj/airbridge/internal/player"
 	"github.com/kenyonj/airbridge/internal/ssdp"
 	"github.com/kenyonj/airbridge/internal/state"
+	"github.com/kenyonj/airbridge/internal/upnp"
 	"github.com/kenyonj/airbridge/pkg/config"
 )
 
@@ -36,6 +37,7 @@ type Instance struct {
 	State        *state.PlayerState
 	Player       *player.RAOPPlayer
 	Server       *http.Server
+	EventManager *upnp.EventManager
 	cancel       context.CancelFunc
 }
 
@@ -144,10 +146,13 @@ func (m *Manager) AddDevice(device *discovery.AirPlayDevice) error {
 	// Create player
 	inst.Player = player.NewRAOPPlayer(device)
 
+	// Create event manager
+	inst.EventManager = upnp.NewEventManager()
+
 	// Setup HTTP server
 	baseURL := fmt.Sprintf("http://%s:%d", m.localIP, port)
 	mux := http.NewServeMux()
-	httpserver.RegisterHTTP(mux, baseURL, inst.UUID, friendlyName, "Airbridge", inst.State, inst.Player)
+	httpserver.RegisterHTTP(mux, baseURL, inst.UUID, friendlyName, "Airbridge", inst.State, inst.Player, inst.EventManager)
 
 	inst.Server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
