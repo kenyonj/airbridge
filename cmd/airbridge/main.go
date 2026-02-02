@@ -17,8 +17,10 @@ import (
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/httpserver"
 	"github.com/kenyonj/airbridge/internal/player"
+	"github.com/kenyonj/airbridge/internal/renderer"
 	"github.com/kenyonj/airbridge/internal/ssdp"
 	"github.com/kenyonj/airbridge/internal/state"
+	"github.com/kenyonj/airbridge/pkg/config"
 	"github.com/kenyonj/airbridge/pkg/raop"
 )
 
@@ -26,9 +28,11 @@ func main() {
 	// Parse flags
 	version := flag.Bool("version", false, "Print version")
 	testStream := flag.String("test", "", "Test streaming to device (by name or IP:port)")
-	serve := flag.Bool("serve", false, "Run as DLNA renderer server")
+	serve := flag.Bool("serve", false, "Run as DLNA renderer server (single device)")
+	serveAll := flag.Bool("serve-all", false, "Run as DLNA renderer server (all devices)")
 	target := flag.String("target", "", "Target AirPlay device name (for serve mode)")
 	port := flag.Int("port", 8200, "HTTP port for DLNA server")
+	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
 
 	fmt.Println("Airbridge - DLNA to AirPlay Bridge")
@@ -52,7 +56,13 @@ func main() {
 		cancel()
 	}()
 
-	// DLNA server mode
+	// Multi-device server mode
+	if *serveAll {
+		runMultiDeviceServer(ctx, *configPath, *port)
+		return
+	}
+
+	// Single device server mode
 	if *serve {
 		runDLNAServer(ctx, *target, *port)
 		return
@@ -290,4 +300,88 @@ func getLocalIP() string {
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String()
+}
+
+// runMultiDeviceServer starts renderers for all discovered AirPlay devices.
+func runMultiDeviceServer(ctx context.Context, configPath string, basePort int) {
+	fmt.Println("Starting multi-device DLNA renderer server...")
+
+	// Load config
+	if configPath == "" {
+		configPath = config.FindConfigFile()
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load config: %v\n", err)
+		cfg = config.DefaultConfig()
+	}
+
+	if basePort > 0 {
+		cfg.HTTPPort = basePort
+	}
+
+	if configPath != "" {
+		fmt.Printf("Loaded config from: %s\n", configPath)
+	}
+
+	// Start device discovery
+	disco := discovery.NewService()
+	if err := disco.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start discovery: %v\n", err)
+		os.Exit(1)
+	}
+	defer disco.Stop()
+
+	// Create renderer manager
+	mgr := renderer.NewManager(cfg)
+	if err := mgr.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start renderer manager: %v\n", err)
+		os.Exit(1)
+	}
+	defer mgr.Stop()
+
+	fmt.Println("Waiting for AirPlay device discovery...")
+	fmt.Println()
+
+	// Periodically update devices
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	// Initial discovery wait
+	time.Sleep(5 * time.Second)
+	mgr.UpdateDevices(disco.GetDevices())
+
+	// Print status
+	printStatus(mgr)
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Goodbye!")
+			return
+
+		case <-ticker.C:
+			mgr.UpdateDevices(disco.GetDevices())
+		}
+	}
+}
+
+func printStatus(mgr *renderer.Manager) {
+	instances := mgr.GetInstances()
+	if len(instances) == 0 {
+		fmt.Println("No devices found. Waiting for discovery...")
+		return
+	}
+
+	fmt.Printf("=== Active Renderers (%d) ===\n", len(instances))
+	for _, inst := range instances {
+		fmt.Printf("  • %s\n", inst.FriendlyName)
+		fmt.Printf("    Port: %d | Target: %s:%d\n",
+			inst.Port, inst.Device.Host, inst.Device.Port)
+	}
+	fmt.Println()
+	fmt.Println("Cast audio to any of these devices from Music Assistant or other DLNA controllers.")
+	fmt.Println("Press Ctrl+C to stop.")
+	fmt.Println()
 }

@@ -1,37 +1,35 @@
 # Airbridge configuration example
+# Place this file at config.yaml or ~/.config/airbridge/config.yaml
 
-# Server settings
-server:
-  # Web UI and API port
-  port: 8080
-  # Network interface to bind to (empty = all interfaces)
-  bind: ""
+# HTTP port for the first renderer (subsequent renderers use incremental ports)
+http_port: 8200
 
-# AirPlay discovery settings
-discovery:
-  # Enable automatic discovery of AirPlay devices
-  enabled: true
-  # Discovery interval in seconds
-  interval: 30
+# Enable automatic discovery of AirPlay devices
+# When true, a DLNA renderer is created for each discovered device
+auto_discover: true
 
-# Bridge mappings
-# Each entry creates a virtual DLNA renderer that forwards to an AirPlay target
-bridges:
-  # Example: Create a DLNA renderer called "Kitchen Speaker" that forwards to the AirPlay device "Kitchen"
-  - name: "Kitchen Speaker"
-    airplay_target: "Kitchen"
-    # Optional: specify AirPlay device by IP:port instead of name
-    # airplay_address: "192.168.1.100:7000"
-    
-  # Example: Multiple zones
-  # - name: "Living Room"
-  #   airplay_target: "Living Room"
-  # - name: "Bedroom"
-  #   airplay_target: "Primary Bedroom"
+# Prefix for DLNA friendly names (e.g., "Airbridge (Kitchen)")
+name_prefix: "Airbridge"
 
-# Logging
-logging:
-  # Log level: debug, info, warn, error
-  level: info
-  # Log format: text, json
-  format: text
+# Optional: Filter to only include specific devices
+# Leave empty to include all discovered devices
+# device_filter:
+#   - "Kitchen"
+#   - "Living Room"
+#   - "Guest Bedroom"
+
+# Optional: Device-specific configuration
+# These override auto-discovered settings
+devices:
+  # Example: Custom alias for a device
+  # - name: "Kitchen"
+  #   alias: "Kitchen Bridge"
+  #   port: 8201
+
+  # Example: Exclude a device from auto-discovery
+  # - name: "Office"
+  #   enabled: false
+
+  # Example: Set default volume
+  # - name: "Guest Bedroom"
+  #   volume: 60
