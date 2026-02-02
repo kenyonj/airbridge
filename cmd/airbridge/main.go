@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"math"
@@ -13,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/httpserver"
 	"github.com/kenyonj/airbridge/internal/player"
@@ -23,6 +23,15 @@ import (
 	"github.com/kenyonj/airbridge/pkg/config"
 	"github.com/kenyonj/airbridge/pkg/raop"
 )
+
+// generateDeterministicUUID creates a stable UUID from a device identifier.
+// This ensures the same device always gets the same UUID across restarts.
+func generateDeterministicUUID(identifier string) string {
+	hash := sha256.Sum256([]byte("airbridge:" + identifier))
+	// Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
+}
 
 func main() {
 	// Parse flags
@@ -226,7 +235,13 @@ func runDLNAServer(ctx context.Context, targetDevice string, httpPort int) {
 	}
 
 	baseURL := fmt.Sprintf("http://%s:%d", ip, httpPort)
-	deviceUUID := uuid.New().String()
+	// Use deterministic UUID based on device ID so it persists across restarts
+	var deviceUUID string
+	if device != nil {
+		deviceUUID = generateDeterministicUUID(device.DeviceID)
+	} else {
+		deviceUUID = generateDeterministicUUID("default")
+	}
 	serverName := "Airbridge/1.0"
 	friendlyName := "Airbridge"
 	if device != nil {

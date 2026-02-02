@@ -3,13 +3,13 @@ package renderer
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/httpserver"
 	"github.com/kenyonj/airbridge/internal/player"
@@ -17,6 +17,15 @@ import (
 	"github.com/kenyonj/airbridge/internal/state"
 	"github.com/kenyonj/airbridge/pkg/config"
 )
+
+// generateDeterministicUUID creates a stable UUID from an AirPlay device ID.
+// This ensures the same device always gets the same UUID across restarts.
+func generateDeterministicUUID(deviceID string) string {
+	hash := sha256.Sum256([]byte("airbridge:" + deviceID))
+	// Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
+}
 
 // Instance represents a single DLNA renderer instance.
 type Instance struct {
@@ -93,11 +102,22 @@ func (m *Manager) AddDevice(device *discovery.AirPlayDevice) error {
 		return nil // Already have this device
 	}
 
-	// Determine port
-	port := m.basePort + len(m.instances)
+	// Determine port - use hash-based offset for consistency across restarts
+	// This ensures the same device always gets the same port
+	portOffset := int(sha256.Sum256([]byte(device.DeviceID))[0]) % 1000
+	port := m.basePort + portOffset
 	deviceCfg := m.cfg.GetDeviceConfig(device.Name)
 	if deviceCfg != nil && deviceCfg.Port > 0 {
 		port = deviceCfg.Port
+	}
+
+	// Check if port is already in use by another instance
+	for _, inst := range m.instances {
+		if inst.Port == port {
+			// Collision - find next available port
+			port = m.findAvailablePort()
+			break
+		}
 	}
 
 	// Determine friendly name
@@ -106,10 +126,10 @@ func (m *Manager) AddDevice(device *discovery.AirPlayDevice) error {
 		friendlyName = deviceCfg.Alias
 	}
 
-	// Create instance
+	// Create instance with deterministic UUID based on device ID
 	inst := &Instance{
 		Device:       device,
-		UUID:         uuid.New().String(),
+		UUID:         generateDeterministicUUID(device.DeviceID),
 		FriendlyName: friendlyName,
 		Port:         port,
 	}
@@ -189,6 +209,20 @@ func (m *Manager) stopInstance(inst *Instance) {
 	if inst.State != nil {
 		inst.State.Stop()
 	}
+}
+
+// findAvailablePort finds the next available port.
+func (m *Manager) findAvailablePort() int {
+	usedPorts := make(map[int]bool)
+	for _, inst := range m.instances {
+		usedPorts[inst.Port] = true
+	}
+	for port := m.basePort; port < m.basePort+1000; port++ {
+		if !usedPorts[port] {
+			return port
+		}
+	}
+	return m.basePort + len(m.instances)
 }
 
 // UpdateDevices synchronizes renderer instances with discovered devices.

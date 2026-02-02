@@ -185,6 +185,20 @@ func (s *Streamer) Stop() error {
 	return s.cmd.Process.Kill()
 }
 
+// WaitForCompletion waits for cliraop to finish playing (with timeout).
+func (s *Streamer) WaitForCompletion() error {
+	s.mu.Lock()
+	cmd := s.cmd
+	s.mu.Unlock()
+
+	if cmd == nil {
+		return nil
+	}
+
+	// Wait for cliraop to finish (it will exit after draining its buffer)
+	return cmd.Wait()
+}
+
 // SetVolume adjusts the volume (note: requires restart with cliraop).
 func (s *Streamer) SetVolume(volume int) {
 	s.mu.Lock()
