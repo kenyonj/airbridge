@@ -1,0 +1,37 @@
+# Airbridge configuration example
+
+# Server settings
+server:
+  # Web UI and API port
+  port: 8080
+  # Network interface to bind to (empty = all interfaces)
+  bind: ""
+
+# AirPlay discovery settings
+discovery:
+  # Enable automatic discovery of AirPlay devices
+  enabled: true
+  # Discovery interval in seconds
+  interval: 30
+
+# Bridge mappings
+# Each entry creates a virtual DLNA renderer that forwards to an AirPlay target
+bridges:
+  # Example: Create a DLNA renderer called "Kitchen Speaker" that forwards to the AirPlay device "Kitchen"
+  - name: "Kitchen Speaker"
+    airplay_target: "Kitchen"
+    # Optional: specify AirPlay device by IP:port instead of name
+    # airplay_address: "192.168.1.100:7000"
+    
+  # Example: Multiple zones
+  # - name: "Living Room"
+  #   airplay_target: "Living Room"
+  # - name: "Bedroom"
+  #   airplay_target: "Primary Bedroom"
+
+# Logging
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+  # Log format: text, json
+  format: text
