@@ -41,7 +41,11 @@ RUN chmod +x /usr/local/bin/cliraop /usr/local/bin/airbridge
 
 WORKDIR /data
 
-# Copy run script for s6-overlay
-COPY airbridge/run.sh /etc/services.d/airbridge/run
-COPY airbridge/finish /etc/services.d/airbridge/finish
-RUN chmod +x /etc/services.d/airbridge/run /etc/services.d/airbridge/finish
+# Setup s6-overlay v3 service
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/airbridge/dependencies.d \
+    && touch /etc/s6-overlay/s6-rc.d/airbridge/dependencies.d/base \
+    && echo "longrun" > /etc/s6-overlay/s6-rc.d/airbridge/type \
+    && touch /etc/s6-overlay/s6-rc.d/user/contents.d/airbridge
+
+COPY airbridge/run.sh /etc/s6-overlay/s6-rc.d/airbridge/run
+RUN chmod +x /etc/s6-overlay/s6-rc.d/airbridge/run
