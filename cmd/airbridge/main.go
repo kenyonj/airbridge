@@ -37,16 +37,35 @@ func generateDeterministicUUID(identifier string) string {
 		hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
 }
 
+func getEnvInt(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		if i, err := fmt.Sscanf(val, "%d", &defaultVal); err == nil && i == 1 {
+			return defaultVal
+		}
+	}
+	return defaultVal
+}
+
+func getEnvString(key string, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
+}
+
 func main() {
-	// Parse flags
+	// Parse flags (env vars provide defaults)
+	defaultPort := getEnvInt("AIRBRIDGE_PORT", 8200)
+	defaultDB := getEnvString("AIRBRIDGE_DB", "./airbridge.db")
+
 	version := flag.Bool("version", false, "Print version")
 	testStream := flag.String("test", "", "Test streaming to device (by name or IP:port)")
 	serve := flag.Bool("serve", false, "Run as DLNA renderer server (single device)")
 	serveAll := flag.Bool("serve-all", false, "Run as DLNA renderer server (all devices)")
 	webMode := flag.Bool("web", false, "Run with web admin interface")
 	target := flag.String("target", "", "Target AirPlay device name (for serve mode)")
-	port := flag.Int("port", 8200, "HTTP port for DLNA server")
-	dbPath := flag.String("db", "./airbridge.db", "Path to SQLite database")
+	port := flag.Int("port", defaultPort, "HTTP port for DLNA server (env: AIRBRIDGE_PORT)")
+	dbPath := flag.String("db", defaultDB, "Path to SQLite database (env: AIRBRIDGE_DB)")
 	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
 

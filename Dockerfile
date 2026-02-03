@@ -53,4 +53,4 @@ EXPOSE 8200 8201
 # docker run --network=host ...
 
 ENTRYPOINT ["/app/airbridge"]
-CMD ["--web", "--db", "/data/airbridge.db", "--port", "8200"]
+CMD ["--web"]

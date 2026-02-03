@@ -1,5 +1,5 @@
 name: Airbridge
-version: "1.0.0"
+version: "1.0.1"
 slug: airbridge
 description: Bridge DLNA/UPnP audio streams to AirPlay devices
 url: https://github.com/kenyonj/airbridge
@@ -22,6 +22,8 @@ panel_icon: mdi:speaker-multiple
 panel_title: Airbridge
 options:
   log_level: info
+  port: 8200
 schema:
   log_level: list(debug|info|warn|error)
+  port: int(1024,65535)
 image: ghcr.io/kenyonj/airbridge-ha-{arch}
