@@ -1,35 +1,40 @@
+# Build cliraop from source
+FROM debian:bookworm-slim AS cliraop-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    libssl-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN git clone https://github.com/philippe44/libraop.git . \
+    && git submodule update --init --recursive
+
+WORKDIR /src/build
+RUN cmake .. && make
+
+# Build airbridge
+FROM golang:1.24-bookworm AS go-builder
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /airbridge ./cmd/airbridge
+
+# Final image using Home Assistant base
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-# Install dependencies
-RUN apk add --no-cache \
-    ca-certificates \
-    openssl \
-    build-base \
-    cmake \
-    git \
-    openssl-dev \
-    go
+# Copy binaries from build stages
+COPY --from=cliraop-builder /src/build/raop_play-linux-* /usr/local/bin/cliraop
+COPY --from=go-builder /airbridge /usr/local/bin/airbridge
 
-# Build cliraop from source
-WORKDIR /tmp/libraop
-RUN git clone https://github.com/philippe44/libraop.git . \
-    && git submodule update --init --recursive \
-    && mkdir build && cd build \
-    && cmake .. && make \
-    && cp raop_play-linux-* /usr/local/bin/cliraop \
-    && chmod +x /usr/local/bin/cliraop
-
-# Build airbridge
-WORKDIR /tmp/airbridge
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /usr/local/bin/airbridge ./cmd/airbridge
-
-# Cleanup build dependencies
-RUN apk del build-base cmake git go openssl-dev \
-    && rm -rf /tmp/libraop /tmp/airbridge /root/go
+RUN chmod +x /usr/local/bin/cliraop /usr/local/bin/airbridge
 
 WORKDIR /data
 
