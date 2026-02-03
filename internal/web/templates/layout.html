@@ -41,5 +41,26 @@
     <footer class="text-center text-gray-500 text-sm py-4">
         Airbridge v1.0 • <a href="https://github.com/kenyonj/airbridge" class="text-indigo-600 hover:underline">GitHub</a>
     </footer>
+
+    <script>
+        function copyBridgeURL() {
+            const url = document.getElementById('bridge-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const copyIcon = document.getElementById('copy-icon');
+                const checkIcon = document.getElementById('check-icon');
+                const copyText = document.getElementById('copy-text');
+                
+                copyIcon.classList.add('hidden');
+                checkIcon.classList.remove('hidden');
+                copyText.textContent = 'Copied!';
+                
+                setTimeout(() => {
+                    copyIcon.classList.remove('hidden');
+                    checkIcon.classList.add('hidden');
+                    copyText.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+    </script>
 </body>
 </html>

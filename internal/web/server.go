@@ -111,6 +111,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"Uptime":       uptimeStr,
 		"LocalIP":      s.renderers.LocalIP(),
 		"DeviceCount":  len(s.disco.GetDevices()),
+		"BridgeURL":    fmt.Sprintf("http://%s:%d/device.xml", s.renderers.LocalIP(), s.basePort),
 	}
 
 	s.render(w, "layout.html", data)
