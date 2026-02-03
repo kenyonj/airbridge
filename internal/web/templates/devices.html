@@ -31,15 +31,19 @@
     <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition-colors">
         <div class="flex justify-between items-start">
             <div>
-                <div class="font-medium text-gray-800">{{.Name}}</div>
+                <div class="font-medium text-gray-800">
+                    {{if eq .DeviceType "chromecast"}}📺{{else}}🔊{{end}}
+                    {{.Name}}
+                </div>
                 <div class="text-sm text-gray-500">{{.Host}}:{{.Port}}</div>
-                <div class="text-xs text-gray-400 mt-1">{{.Model}}</div>
+                <div class="text-xs text-gray-400 mt-1">{{.Model}} ({{.DeviceType}})</div>
             </div>
             {{if .Configured}}
             <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Configured</span>
             {{else}}
             <form hx-post="/admin/renderers" hx-target="body" hx-swap="outerHTML" class="inline">
                 <input type="hidden" name="device_id" value="{{.DeviceID}}">
+                <input type="hidden" name="device_type" value="{{.DeviceType}}">
                 <input type="hidden" name="name" value="{{.Name}}">
                 <button type="submit" class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
                     Add
@@ -55,8 +59,8 @@
     {{if .FilterModel}}
     <p>No devices matching "{{.FilterModel}}".</p>
     {{else}}
-    <p>No AirPlay devices found.</p>
-    <p class="text-sm">Make sure your AirPlay devices are on the same network.</p>
+    <p>No devices found.</p>
+    <p class="text-sm">Make sure your AirPlay/Chromecast devices are on the same network.</p>
     {{end}}
 </div>
 {{end}}

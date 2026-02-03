@@ -16,6 +16,9 @@ import (
 	"github.com/kenyonj/airbridge/internal/discovery"
 )
 
+// Version is the current Airbridge version, displayed in the web UI.
+const Version = "0.0.3"
+
 //go:embed templates/*.html
 var templateFS embed.FS
 
@@ -109,6 +112,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Title":        "Dashboard",
 		"Active":       "dashboard",
+		"Version":      Version,
 		"Renderers":    views,
 		"RunningCount": s.renderers.RunningCount(),
 		"TotalCount":   len(renderers),
@@ -454,7 +458,7 @@ func (s *Server) handleServerStatus(w http.ResponseWriter, r *http.Request) {
 		"TotalCount":   len(renderers),
 		"Uptime":       formatDuration(uptime),
 		"LocalIP":      s.renderers.LocalIP(),
-		"DeviceCount":  len(s.disco.GetDevices()),
+		"DeviceCount":  len(s.disco.GetDevices()) + len(s.disco.GetChromecasts()),
 	}
 
 	s.renderPartial(w, "server_status.html", data)
