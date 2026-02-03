@@ -74,7 +74,7 @@ func main() {
 	fmt.Println()
 
 	if *version {
-		fmt.Println("Version: 1.0.3")
+		fmt.Println("Version: 0.1.0")
 		return
 	}
 
