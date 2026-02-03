@@ -15,21 +15,21 @@ func RegisterHTTP(mux *http.ServeMux, baseURL, deviceUUID, friendlyName, manufac
 	// Device description
 	mux.HandleFunc("/device.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Write([]byte(upnp.DeviceDescriptionXML(baseURL, deviceUUID, friendlyName, manufacturer)))
+		_, _ = w.Write([]byte(upnp.DeviceDescriptionXML(baseURL, deviceUUID, friendlyName, manufacturer)))
 	})
 
 	// Service descriptions
 	mux.HandleFunc("/upnp/service/avtransport.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Write([]byte(upnp.SCPDAVTransportXML()))
+		_, _ = w.Write([]byte(upnp.SCPDAVTransportXML()))
 	})
 	mux.HandleFunc("/upnp/service/renderingcontrol.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Write([]byte(upnp.SCPDRenderingControlXML()))
+		_, _ = w.Write([]byte(upnp.SCPDRenderingControlXML()))
 	})
 	mux.HandleFunc("/upnp/service/connectionmanager.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Write([]byte(upnp.SCPDConnectionManagerXML()))
+		_, _ = w.Write([]byte(upnp.SCPDConnectionManagerXML()))
 	})
 
 	// Service control endpoints
@@ -49,7 +49,7 @@ func RegisterHTTP(mux *http.ServeMux, baseURL, deviceUUID, friendlyName, manufac
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte("Airbridge DLNA Renderer running\n"))
+		_, _ = w.Write([]byte("Airbridge DLNA Renderer running\n"))
 	})
 }
 

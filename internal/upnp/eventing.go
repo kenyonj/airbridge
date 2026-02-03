@@ -40,7 +40,7 @@ func NewEventManager() *EventManager {
 // generateSID creates a globally unique subscription ID.
 func generateSID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("uuid:%08x-%04x-%04x-%04x-%012x",
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
@@ -60,7 +60,7 @@ func (em *EventManager) Subscribe(r *http.Request, serviceID string) (sid string
 	// Parse timeout from TIMEOUT header: Second-1800
 	timeoutSec := 1800
 	if to := r.Header.Get("TIMEOUT"); to != "" {
-		fmt.Sscanf(to, "Second-%d", &timeoutSec)
+		_, _ = fmt.Sscanf(to, "Second-%d", &timeoutSec)
 	}
 
 	// Generate globally unique SID

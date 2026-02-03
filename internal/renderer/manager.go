@@ -209,7 +209,7 @@ func (m *Manager) stopInstance(inst *Instance) {
 		inst.cancel()
 	}
 	if inst.Server != nil {
-		inst.Server.Shutdown(context.Background())
+		_ = inst.Server.Shutdown(context.Background())
 	}
 	if inst.State != nil {
 		inst.State.Stop()
@@ -234,7 +234,7 @@ func (m *Manager) findAvailablePort() int {
 func (m *Manager) UpdateDevices(devices []*discovery.AirPlayDevice) {
 	// Add new devices
 	for _, device := range devices {
-		m.AddDevice(device)
+		_ = m.AddDevice(device)
 	}
 
 	// Note: We don't remove devices when they disappear, as they may just be

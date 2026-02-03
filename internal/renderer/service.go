@@ -243,7 +243,7 @@ func (s *Service) stopInstance(inst *Instance) {
 		inst.cancel()
 	}
 	if inst.Server != nil {
-		inst.Server.Shutdown(context.Background())
+		_ = inst.Server.Shutdown(context.Background())
 	}
 	if inst.State != nil {
 		inst.State.Stop()

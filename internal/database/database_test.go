@@ -143,7 +143,7 @@ func TestToggleRenderer(t *testing.T) {
 		Enabled:         true,
 		CreatedAt:       time.Now(),
 	}
-	db.CreateRenderer(r)
+	_ = db.CreateRenderer(r)
 
 	// Toggle off
 	if err := db.ToggleRenderer("toggle-test"); err != nil {
@@ -155,7 +155,7 @@ func TestToggleRenderer(t *testing.T) {
 	}
 
 	// Toggle on
-	db.ToggleRenderer("toggle-test")
+	_ = db.ToggleRenderer("toggle-test")
 	got, _ = db.GetRenderer("toggle-test")
 	if !got.Enabled {
 		t.Error("expected Enabled to be true after second toggle")
@@ -177,7 +177,7 @@ func TestRenameRenderer(t *testing.T) {
 		Enabled:         true,
 		CreatedAt:       time.Now(),
 	}
-	db.CreateRenderer(r)
+	_ = db.CreateRenderer(r)
 
 	if err := db.RenameRenderer("rename-test", "New Name"); err != nil {
 		t.Fatalf("RenameRenderer failed: %v", err)
@@ -206,7 +206,7 @@ func TestGetNextPort(t *testing.T) {
 	}
 
 	// Add renderer with port 8200
-	db.CreateRenderer(&Renderer{
+	_ = db.CreateRenderer(&Renderer{
 		ID:              "r1",
 		Name:            "R1",
 		AirPlayDeviceID: "d1",
@@ -220,7 +220,7 @@ func TestGetNextPort(t *testing.T) {
 	}
 
 	// Add renderer with port 8205
-	db.CreateRenderer(&Renderer{
+	_ = db.CreateRenderer(&Renderer{
 		ID:              "r2",
 		Name:            "R2",
 		AirPlayDeviceID: "d2",
@@ -260,7 +260,7 @@ func TestSettings(t *testing.T) {
 	}
 
 	// Update existing
-	db.SetSetting("theme", "light")
+	_ = db.SetSetting("theme", "light")
 	val, _ = db.GetSetting("theme")
 	if val != "light" {
 		t.Errorf("expected 'light' after update, got %q", val)

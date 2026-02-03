@@ -37,7 +37,7 @@ func WriteSOAPResponse(w http.ResponseWriter, namespace, respName, inner string)
   </s:Body>
 </s:Envelope>`)
 
-	w.Write([]byte(b.String()))
+	_, _ = w.Write([]byte(b.String()))
 }
 
 // WriteSOAPError writes a SOAP error response.
@@ -66,7 +66,7 @@ func WriteSOAPError(w http.ResponseWriter, code int, desc string) {
   </s:Body>
 </s:Envelope>`)
 
-	w.Write([]byte(b.String()))
+	_, _ = w.Write([]byte(b.String()))
 }
 
 // XMLText extracts the text content of an XML element from raw bytes.

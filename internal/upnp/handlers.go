@@ -168,7 +168,7 @@ func RenderingControlHandler(st *state.PlayerState, player Player) http.HandlerF
 			}
 			vStr := XMLText(body, "DesiredVolume")
 			v := 80
-			fmt.Sscanf(vStr, "%d", &v)
+			_, _ = fmt.Sscanf(vStr, "%d", &v)
 			if v < 0 {
 				v = 0
 			}

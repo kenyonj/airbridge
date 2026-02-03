@@ -221,7 +221,7 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	deviceID := r.FormValue("device_id")
 	name := r.FormValue("name")
 
@@ -374,7 +374,7 @@ func (s *Server) editRendererForm(w http.ResponseWriter, r *http.Request, id str
 }
 
 func (s *Server) renameRenderer(w http.ResponseWriter, r *http.Request, id string) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	name := strings.TrimSpace(r.FormValue("name"))
 
 	if name == "" {

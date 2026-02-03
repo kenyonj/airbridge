@@ -35,9 +35,6 @@ type PlayerState struct {
 	// Volume state
 	volume int
 	muted  bool
-
-	// Stream start time for position tracking
-	startTime int64
 }
 
 // New creates a new PlayerState.

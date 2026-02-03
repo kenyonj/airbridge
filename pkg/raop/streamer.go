@@ -148,7 +148,7 @@ func (s *Streamer) Start(ctx context.Context, audio io.Reader) error {
 	// Pipe audio to cliraop
 	go func() {
 		defer stdin.Close()
-		io.Copy(stdin, audio)
+		_, _ = io.Copy(stdin, audio)
 	}()
 
 	// Wait for command to finish in background

@@ -67,7 +67,7 @@ func AnnounceWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID
 					"BOOTID.UPNP.ORG: 1\r\n"+
 					"CONFIGID.UPNP.ORG: 1\r\n\r\n",
 				ssdpAddr, cacheMaxAge, location, t.st, serverName, t.usn)
-			conn.Write([]byte(msg))
+			_, _ = conn.Write([]byte(msg))
 		}
 	}
 
@@ -80,7 +80,7 @@ func AnnounceWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID
 					"NTS: ssdp:byebye\r\n"+
 					"USN: %s\r\n\r\n",
 				ssdpAddr, t.st, t.usn)
-			conn.Write([]byte(msg))
+			_, _ = conn.Write([]byte(msg))
 		}
 	}
 
@@ -132,7 +132,7 @@ func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, dev
 	}
 
 	for {
-		conn.SetDeadline(time.Now().Add(2 * time.Second))
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 		n, src, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
@@ -174,7 +174,7 @@ func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, dev
 				"BOOTID.UPNP.ORG: 1\r\n"+
 				"CONFIGID.UPNP.ORG: 1\r\n\r\n",
 			cacheMaxAge, time.Now().UTC().Format(time.RFC1123), location, serverName, st, usn)
-		conn.WriteToUDP([]byte(resp), src)
+		_, _ = conn.WriteToUDP([]byte(resp), src)
 	}
 }
 

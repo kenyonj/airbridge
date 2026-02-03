@@ -103,7 +103,7 @@ func (b *Bridge) Stop() {
 	if b.server != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		b.server.Shutdown(shutdownCtx)
+		_ = b.server.Shutdown(shutdownCtx)
 	}
 
 	if b.cancel != nil {
@@ -281,15 +281,15 @@ func (b *Bridge) startHTTPServer() error {
 	// Service descriptions (shared)
 	mux.HandleFunc("/upnp/service/avtransport.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-		w.Write([]byte(upnp.SCPDAVTransportXML()))
+		_, _ = w.Write([]byte(upnp.SCPDAVTransportXML()))
 	})
 	mux.HandleFunc("/upnp/service/renderingcontrol.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-		w.Write([]byte(upnp.SCPDRenderingControlXML()))
+		_, _ = w.Write([]byte(upnp.SCPDRenderingControlXML()))
 	})
 	mux.HandleFunc("/upnp/service/connectionmanager.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-		w.Write([]byte(upnp.SCPDConnectionManagerXML()))
+		_, _ = w.Write([]byte(upnp.SCPDConnectionManagerXML()))
 	})
 
 	b.server = &http.Server{
@@ -316,7 +316,7 @@ func (b *Bridge) handleDeviceDescription(w http.ResponseWriter, r *http.Request)
 	xml := b.generateDeviceXML(baseURL)
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-	w.Write([]byte(xml))
+	_, _ = w.Write([]byte(xml))
 }
 
 // generateDeviceXML creates the root device description with embedded devices.
@@ -472,7 +472,7 @@ func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request,
 		renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID)
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-	w.Write([]byte(xml))
+	_, _ = w.Write([]byte(xml))
 }
 
 // handleControl handles SOAP control requests.

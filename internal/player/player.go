@@ -129,12 +129,12 @@ func (p *RAOPPlayer) Play(ctx context.Context, uri string, volume int) error {
 		}
 
 		// Wait for ffmpeg to finish (it will exit when input ends or context cancelled)
-		p.ffmpeg.Wait()
+		_ = p.ffmpeg.Wait()
 		log.Printf("FFmpeg finished, waiting for cliraop to drain buffer...")
 
 		// Wait for cliraop to finish playing buffered audio
 		// This gives it time to play out remaining samples
-		p.streamer.WaitForCompletion()
+		_ = p.streamer.WaitForCompletion()
 		log.Printf("Playback complete")
 
 		// Now clean up
@@ -172,13 +172,13 @@ func (p *RAOPPlayer) stopInternal() {
 	}
 
 	if p.ffmpeg != nil && p.ffmpeg.Process != nil {
-		p.ffmpeg.Process.Kill()
-		p.ffmpeg.Wait()
+		_ = p.ffmpeg.Process.Kill()
+		_ = p.ffmpeg.Wait()
 		p.ffmpeg = nil
 	}
 
 	if p.streamer != nil {
-		p.streamer.Stop()
+		_ = p.streamer.Stop()
 		p.streamer = nil
 	}
 }

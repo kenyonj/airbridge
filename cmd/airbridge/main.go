@@ -173,7 +173,7 @@ func main() {
 		case <-time.After(10 * time.Second):
 		}
 
-		streamer.Stop()
+		_ = streamer.Stop()
 		fmt.Println("Test complete!")
 		return
 	}
@@ -333,7 +333,7 @@ func runDLNAServer(ctx context.Context, targetDevice string, httpPort int) {
 
 	// Wait for shutdown
 	<-ctx.Done()
-	srv.Shutdown(context.Background())
+	_ = srv.Shutdown(context.Background())
 	fmt.Println("Goodbye!")
 }
 
@@ -503,5 +503,5 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	srv.Shutdown(shutdownCtx)
+	_ = srv.Shutdown(shutdownCtx)
 }
