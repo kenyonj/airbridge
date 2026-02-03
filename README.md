@@ -1,8 +1,8 @@
 # Airbridge
 
-> Bridge DLNA/UPnP audio streams to AirPlay (RAOP) devices
+> Bridge DLNA/UPnP audio streams to AirPlay and Chromecast devices
 
-Airbridge creates virtual DLNA renderers that forward audio to AirPlay speakers. This allows media servers like [Music Assistant](https://music-assistant.io/) to stream to AirPlay-only devices through DLNA.
+Airbridge creates virtual DLNA renderers that forward audio to AirPlay speakers and Chromecast devices. This allows media servers like [Music Assistant](https://music-assistant.io/) to stream to these devices through DLNA.
 
 ## Why?
 
@@ -11,15 +11,18 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 1. Presenting itself as standard DLNA/UPnP renderers
 2. Receiving audio streams via HTTP
 3. Forwarding to AirPlay devices using [libraop](https://github.com/philippe44/libraop)
+4. Or sending media URLs to Chromecast devices via CASTV2
 
 ## Features
 
-- 🎵 Virtual DLNA renderer per AirPlay zone
-- 📡 Automatic AirPlay device discovery (mDNS)
+- 🎵 Virtual DLNA renderer per AirPlay/Chromecast zone
+- 📡 Automatic device discovery (mDNS for both AirPlay and Chromecast)
+- 📺 **NEW:** Chromecast support - cast DLNA audio to Chromecast devices
 - ⚙️ YAML configuration for device filtering and aliases
 - 🔊 Volume control support
 - 🌐 Web admin interface for managing devices
 - 🐳 Docker deployment with Unraid support
+- ✅ Comprehensive test suite with CI/CD
 
 ## Status
 
@@ -28,13 +31,13 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 ### What works:
 - DLNA renderer creation and discovery
 - Audio streaming to AirPlay devices
+- **Chromecast as output target** (URL-based media playback)
 - Web admin interface
 - Docker/Unraid/Home Assistant deployment
+- Full test suite with CI/CD pipeline
 
-### Planned:
-- Chromecast support ([#1](https://github.com/kenyonj/airbridge/issues/1), [#2](https://github.com/kenyonj/airbridge/issues/2))
-- Spotify Connect support ([#3](https://github.com/kenyonj/airbridge/issues/3))
-- Tests and CI ([#4](https://github.com/kenyonj/airbridge/issues/4))
+### Known Limitations:
+- Chromecast *receiver* support (casting FROM apps like Spotify TO Airbridge) is blocked by Google's device authentication requirements
 
 ## Quick Start
 
@@ -142,26 +145,29 @@ devices:
 ┌─────────────┐     DLNA/UPnP     ┌─────────────────┐     RAOP      ┌──────────────┐
 │ Media       │ ────────────────▶ │   Airbridge     │ ────────────▶ │ AirPlay      │
 │ Server      │                   │                 │               │ Speakers     │
-│ (MA, Plex)  │                   │ ┌─────────────┐ │               │              │
-└─────────────┘                   │ │ Virtual     │ │               │ ┌──────────┐ │
-                                  │ │ DLNA        │ │               │ │ Zone 1   │ │
-                                  │ │ Renderers   │ │               │ └──────────┘ │
-                                  │ └──────┬──────┘ │               │ ┌──────────┐ │
-                                  │        │        │               │ │ Zone 2   │ │
-                                  │ ┌──────▼──────┐ │               │ └──────────┘ │
-                                  │ │ libraop     │ │               │      ⋮       │
-                                  │ │ RAOP client │ │               └──────────────┘
-                                  │ └─────────────┘ │
-                                  └─────────────────┘
+│ (MA, Plex)  │                   │ ┌─────────────┐ │               └──────────────┘
+└─────────────┘                   │ │ Virtual     │ │
+                                  │ │ DLNA        │ │     CASTV2    ┌──────────────┐
+                                  │ │ Renderers   │ │ ────────────▶ │ Chromecast   │
+                                  │ └─────────────┘ │   (URL-based) │ Devices      │
+                                  └─────────────────┘               └──────────────┘
 ```
+
+### Device Types
+
+| Type | Protocol | How it works |
+|------|----------|--------------|
+| **AirPlay** | RAOP via cliraop | Airbridge receives audio, transcodes, and *pushes* to device |
+| **Chromecast** | CASTV2 via go-chromecast | Airbridge sends URL, device *pulls* media directly |
 
 ## How It Works
 
-1. **Discovery**: Airbridge uses mDNS to discover AirPlay/RAOP devices on your network
+1. **Discovery**: Airbridge uses mDNS to discover AirPlay (`_raop._tcp`) and Chromecast (`_googlecast._tcp`) devices
 2. **SSDP**: For each device, it advertises a virtual DLNA MediaRenderer
 3. **SOAP**: When a media server (like Music Assistant) connects, it handles AVTransport and RenderingControl SOAP requests
-4. **Streaming**: Audio is received via HTTP and piped to the `cliraop` binary
-5. **RAOP**: The cliraop process streams audio to the AirPlay device using RAOP protocol
+4. **Streaming**: 
+   - **AirPlay**: Audio is received via HTTP and piped to the `cliraop` binary, which streams to the device
+   - **Chromecast**: The media URL is sent to the Chromecast, which fetches and plays it directly
 
 ## Use with Music Assistant
 
@@ -229,9 +235,9 @@ make clean      # Clean build artifacts
 ├── internal/
 │   ├── bridge/          # Unified DLNA bridge with embedded devices
 │   ├── database/        # SQLite database for web mode
-│   ├── discovery/       # mDNS-based AirPlay discovery
+│   ├── discovery/       # mDNS-based AirPlay and Chromecast discovery
 │   ├── httpserver/      # HTTP server for UPnP endpoints
-│   ├── player/          # RAOP player implementation
+│   ├── player/          # Player implementations (RAOP + Chromecast)
 │   ├── renderer/        # Multi-device renderer manager
 │   ├── ssdp/            # SSDP announcement/discovery
 │   ├── state/           # Playback state management
@@ -243,24 +249,40 @@ make clean      # Clean build artifacts
 └── unraid/              # Unraid Community Apps template
 ```
 
+### Testing
+
+```bash
+make test           # Run all tests
+make lint           # Run golangci-lint
+go test -race ./... # Run with race detection
+```
+
 ## Tested With
 
-- ✅ Juke Audio 8-zone multi-room speakers
-- ✅ HomePod mini (as AirPlay target)
-- ✅ Apple TV (as AirPlay target)
+- ✅ Juke Audio 8-zone multi-room speakers (AirPlay)
+- ✅ HomePod mini (AirPlay)
+- ✅ Apple TV (AirPlay)
 - ✅ Sonos (AirPlay mode)
+- ✅ Google Chromecast (Chromecast)
+- ✅ Google Nest Hub (Chromecast)
 
 ## Troubleshooting
 
 ### Device not discovered
-- Ensure your AirPlay device is on the same network
-- Try: `dns-sd -B _raop._tcp` to verify mDNS discovery works
+- Ensure your device is on the same network
+- For AirPlay: `dns-sd -B _raop._tcp`
+- For Chromecast: `dns-sd -B _googlecast._tcp`
 - Check firewall settings allow mDNS (port 5353 UDP)
 
-### Audio doesn't play
+### Audio doesn't play (AirPlay)
 - Verify cliraop binary is in `bin/` directory
 - Test directly: `./bin/airbridge --test "Device Name"`
 - Check logs for connection errors
+
+### Audio doesn't play (Chromecast)
+- Ensure the media URL is accessible from the Chromecast's network
+- Chromecast pulls the media directly - it needs to reach the URL
+- Check logs for CASTV2 connection errors
 
 ### DLNA renderer not visible
 - Ensure port 8200+ is not blocked by firewall
@@ -280,5 +302,6 @@ If you find Airbridge useful, consider supporting development:
 ## Credits
 
 - [philippe44/libraop](https://github.com/philippe44/libraop) - RAOP client library
+- [vishen/go-chromecast](https://github.com/vishen/go-chromecast) - Chromecast client library
 - [tr1v3r/rcast](https://github.com/tr1v3r/rcast) - DLNA renderer reference
 - [grandcat/zeroconf](https://github.com/grandcat/zeroconf) - mDNS library
