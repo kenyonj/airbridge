@@ -177,6 +177,17 @@ docker run -d --network=host ghcr.io/kenyonj/airbridge:latest --serve-all
 
 Airbridge is available in the Unraid Community Applications store. Search for "Airbridge" or manually install using the template at `unraid/airbridge.xml`.
 
+### Home Assistant
+
+Airbridge is available as a Home Assistant add-on:
+
+1. Go to **Settings → Add-ons → Add-on Store**
+2. Click the ⋮ menu → **Repositories**
+3. Add: `https://github.com/kenyonj/airbridge`
+4. Click **Close** and refresh the page
+5. Find "Airbridge" in the add-on list and click **Install**
+6. Start the add-on and open the **Web UI** to manage devices
+
 ### Build Docker Image Locally
 
 ```bash
