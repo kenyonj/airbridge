@@ -29,6 +29,6 @@
   <DonateText/>
   <DonateLink/>
   <Requires/>
-  <Config Name="Web Admin Port" Target="8200" Default="8200" Mode="tcp" Description="Port for the web admin interface" Type="Port" Display="always" Required="true" Mask="false">8200</Config>
   <Config Name="Data Path" Target="/data" Default="/mnt/user/appdata/airbridge" Mode="rw" Description="Persistent storage for database and configuration" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/airbridge</Config>
+  <Config Name="Web Admin Port" Target="AIRBRIDGE_PORT" Default="8200" Description="Port for the web admin interface (change if 8200 is in use)" Type="Variable" Display="always" Required="true" Mask="false">8200</Config>
 </Container>
