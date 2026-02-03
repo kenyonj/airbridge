@@ -248,6 +248,13 @@ make clean      # Clean build artifacts
 
 MIT License - see [LICENSE](LICENSE)
 
+## Support
+
+If you find Airbridge useful, consider supporting development:
+
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/kenyonj?style=for-the-badge&logo=github&label=Sponsor)](https://github.com/sponsors/kenyonj)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?style=for-the-badge&logo=ko-fi)](https://ko-fi.com/kenyonj)
+
 ## Credits
 
 - [philippe44/libraop](https://github.com/philippe44/libraop) - RAOP client library
