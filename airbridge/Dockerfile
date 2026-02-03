@@ -41,8 +41,7 @@ RUN chmod +x /usr/local/bin/cliraop /usr/local/bin/airbridge
 
 WORKDIR /data
 
-# Copy run script
-COPY homeassistant/airbridge/run.sh /run.sh
-RUN chmod +x /run.sh
-
-CMD ["/run.sh"]
+# Copy run script for s6-overlay
+COPY airbridge/run.sh /etc/services.d/airbridge/run
+COPY airbridge/finish /etc/services.d/airbridge/finish
+RUN chmod +x /etc/services.d/airbridge/run /etc/services.d/airbridge/finish
