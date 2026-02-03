@@ -1,6 +1,6 @@
 # Copilot Instructions for Airbridge
 
-Airbridge bridges DLNA/UPnP audio streams to AirPlay (RAOP) devices. It creates virtual DLNA renderers that forward audio to AirPlay speakers.
+Airbridge bridges DLNA/UPnP audio streams to AirPlay (RAOP) and Chromecast devices. It creates virtual DLNA renderers that forward audio to speakers.
 
 ## Build, Test, Lint
 
@@ -15,17 +15,25 @@ make fmt         # Format code with gofmt
 ## Architecture
 
 ### Data Flow
-Media servers (Music Assistant, Plex) → DLNA/UPnP → Airbridge → RAOP → AirPlay speakers
+```
+Media servers (Music Assistant, Plex) → DLNA/UPnP → Airbridge → AirPlay speakers (via RAOP)
+                                                             → Chromecast devices (via CASTV2)
+```
 
 ### Key Components
 
 - **`cmd/airbridge/main.go`** - Entry point with three modes: `--serve` (single device), `--serve-all` (multi-device), `--web` (admin UI)
 - **`internal/bridge/`** - Unified DLNA bridge with embedded renderers for web mode; manages HTTP server with `/device.xml` root and `/renderer/{uuid}/` routes
 - **`internal/renderer/`** - Manager for multi-device mode (`--serve-all`); creates one HTTP server per AirPlay device with deterministic ports/UUIDs
-- **`internal/discovery/`** - mDNS service discovery for `_raop._tcp` (AirPlay devices)
+- **`internal/discovery/`** - mDNS service discovery for `_raop._tcp` (AirPlay) and `_googlecast._tcp` (Chromecast)
 - **`internal/upnp/`** - SOAP handlers for AVTransport, RenderingControl, ConnectionManager services
 - **`internal/ssdp/`** - SSDP announce/search responder for DLNA device advertisement
+- **`internal/player/`** - Player implementations: `RAOPPlayer` (AirPlay via cliraop) and `ChromecastPlayer` (via go-chromecast)
 - **`pkg/raop/`** - Subprocess wrapper for `cliraop` binary that handles RAOP streaming
+
+### Device Types
+- **AirPlay** (`device_type: "airplay"`): Push model - Airbridge streams audio to device via RAOP
+- **Chromecast** (`device_type: "chromecast"`): Pull model - Device fetches media from URL via CASTV2
 
 ### Two Rendering Architectures
 
@@ -78,4 +86,7 @@ make test                     # Via Makefile
 ## Known Limitations
 
 ### Chromecast Receiver (Issue #1)
-Implementing Chromecast receiver support is blocked by Google's device authentication requirements. CASTV2 protocol requires signed certificates from real Chromecast hardware. Consider Chromecast as *output target* (issue #2) instead, which uses client-side casting without auth issues.
+Implementing Chromecast *receiver* support (casting FROM apps like Spotify TO Airbridge) is blocked by Google's device authentication requirements. CASTV2 protocol requires signed certificates from real Chromecast hardware.
+
+### Chromecast Output (Supported)
+Chromecast as *output target* (casting FROM DLNA TO Chromecast) works using `github.com/vishen/go-chromecast`. Note: Chromecast uses a pull model - the device fetches media from URLs, so the media source must be reachable by the Chromecast.
