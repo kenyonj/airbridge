@@ -39,6 +39,10 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
+# Pull latest changes
+echo "Pulling latest changes..."
+git pull origin main
+
 # Get the latest version tag
 LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 echo "Current version: $LATEST_TAG"
@@ -64,12 +68,24 @@ case $BUMP_TYPE in
 esac
 
 NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+VERSION_NUM="${MAJOR}.${MINOR}.${PATCH}"
 echo "New version: $NEW_VERSION"
 
-# Pull latest changes
+# Update version in source files
 echo ""
-echo "Pulling latest changes..."
-git pull origin main
+echo "Updating version in source files..."
+
+# Update cmd/airbridge/main.go
+sed -i '' "s/Version: [0-9]*\.[0-9]*\.[0-9]*/Version: ${VERSION_NUM}/" cmd/airbridge/main.go
+
+# Update airbridge/config.yaml
+sed -i '' "s/^version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"${VERSION_NUM}\"/" airbridge/config.yaml
+
+# Commit version bump
+echo "Committing version bump..."
+git add cmd/airbridge/main.go airbridge/config.yaml
+git commit -m "Bump version to ${NEW_VERSION}"
+git push origin main
 
 # Create and push tag
 echo "Creating tag $NEW_VERSION..."
