@@ -43,23 +43,49 @@
     </footer>
 
     <script>
-        function copyBridgeURL() {
-            const url = document.getElementById('bridge-url').textContent;
-            navigator.clipboard.writeText(url).then(() => {
-                const copyIcon = document.getElementById('copy-icon');
-                const checkIcon = document.getElementById('check-icon');
-                const copyText = document.getElementById('copy-text');
-                
-                copyIcon.classList.add('hidden');
-                checkIcon.classList.remove('hidden');
-                copyText.textContent = 'Copied!';
-                
-                setTimeout(() => {
-                    copyIcon.classList.remove('hidden');
-                    checkIcon.classList.add('hidden');
-                    copyText.textContent = 'Copy';
-                }, 2000);
-            });
+        function copyToClipboard(btn, text) {
+            // Try modern clipboard API first, fallback to execCommand
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showCopied(btn);
+                }).catch(function() {
+                    fallbackCopy(btn, text);
+                });
+            } else {
+                fallbackCopy(btn, text);
+            }
+        }
+
+        function fallbackCopy(btn, text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showCopied(btn);
+            } catch (err) {
+                console.error('Copy failed', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function showCopied(btn) {
+            var copyIcon = btn.querySelector('.copy-icon');
+            var checkIcon = btn.querySelector('.check-icon');
+            var copyText = btn.querySelector('.copy-text');
+            
+            copyIcon.classList.add('hidden');
+            checkIcon.classList.remove('hidden');
+            copyText.textContent = 'Copied!';
+            
+            setTimeout(function() {
+                copyIcon.classList.remove('hidden');
+                checkIcon.classList.add('hidden');
+                copyText.textContent = 'Copy URL';
+            }, 2000);
         }
     </script>
 </body>

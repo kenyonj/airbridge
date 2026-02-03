@@ -42,6 +42,7 @@ type DeviceInfo struct {
 type RendererView struct {
 	database.Renderer
 	Running bool
+	DLNAURL string
 }
 
 // RendererController is the interface for managing renderer lifecycle.
@@ -89,12 +90,14 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build renderer views with running status
+	// Build renderer views with running status and DLNA URLs
+	localIP := s.renderers.LocalIP()
 	var views []RendererView
 	for _, r := range renderers {
 		views = append(views, RendererView{
 			Renderer: r,
 			Running:  s.renderers.IsRunning(r.ID),
+			DLNAURL:  fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
 		})
 	}
 
@@ -109,9 +112,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"RunningCount": s.renderers.RunningCount(),
 		"TotalCount":   len(renderers),
 		"Uptime":       uptimeStr,
-		"LocalIP":      s.renderers.LocalIP(),
+		"LocalIP":      localIP,
 		"DeviceCount":  len(s.disco.GetDevices()),
-		"BridgeURL":    fmt.Sprintf("http://%s:%d/device.xml", s.renderers.LocalIP(), s.basePort),
 	}
 
 	s.render(w, "layout.html", data)
