@@ -42,3 +42,40 @@ Audio streaming requires the external `cliraop` binary from [libraop](https://gi
 
 ### Configuration
 YAML config loaded from `--config` flag, `./config.yaml`, or `~/.config/airbridge/config.yaml`. See `config.example.yaml`.
+
+### Version Management
+Version is tracked in two places that must stay in sync:
+- `cmd/airbridge/main.go:77` - `fmt.Println("Version: X.X.X")`
+- `airbridge/config.yaml:2` - `version: "X.X.X"`
+
+Use `./scripts/release.sh bump [major|minor|patch]` to update versions, commit, tag, and push.
+
+### Error Handling Style
+Use `_, _ =` pattern for intentionally ignored error returns (e.g., `_, _ = w.Write(...)`) to satisfy golangci-lint.
+
+## Testing
+
+### Test Patterns
+- Table-driven tests throughout
+- `httptest` package for HTTP handler tests
+- In-memory SQLite (`:memory:`) for database tests
+- Use `zeroconf.NewServiceEntry()` constructor for mDNS test fixtures (not struct literals)
+
+### Running Tests
+```bash
+go test -race ./...           # All tests with race detection
+go test -v ./internal/upnp    # Single package verbose
+make test                     # Via Makefile
+```
+
+## CI/CD
+
+### GitHub Actions Workflows
+- **test.yml** - Runs on push to main and PRs; tests Go 1.22/1.23/1.24 + golangci-lint
+- **docker.yml** - Builds Docker images; triggers only on version tags (`v*`)
+- **ha-addon.yml** - Builds Home Assistant addon; triggers only on version tags and releases
+
+## Known Limitations
+
+### Chromecast Receiver (Issue #1)
+Implementing Chromecast receiver support is blocked by Google's device authentication requirements. CASTV2 protocol requires signed certificates from real Chromecast hardware. Consider Chromecast as *output target* (issue #2) instead, which uses client-side casting without auth issues.
