@@ -141,7 +141,9 @@ func (r *Receiver) Start() error {
 		// For DLNA: need to serve PCM over HTTP and send URL via SOAP
 		
 		// For now, just consume and discard the audio
-		_, _ = io.Copy(io.Discard, stdout)
+		if _, err := io.Copy(io.Discard, stdout); err != nil {
+			log.Printf("Error reading audio stream from shairport-sync: %v", err)
+		}
 		log.Printf("Virtual receiver audio stream ended: %s", r.name)
 	}()
 
