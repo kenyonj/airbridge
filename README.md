@@ -227,6 +227,16 @@ make build      # Build airbridge
 make clean      # Clean build artifacts
 ```
 
+### Local Development
+
+The easiest way to run Airbridge locally is with the dev script, which rebuilds and runs in one command:
+
+```bash
+./scripts/dev.sh --web        # Web admin interface (recommended)
+./scripts/dev.sh --serve-all  # All discovered devices
+./scripts/dev.sh --serve "Device Name"  # Single device
+```
+
 ### Project Structure
 
 ```
