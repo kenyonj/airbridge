@@ -2,14 +2,7 @@ name: Build Home Assistant Add-on
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'airbridge/**'
-      - 'cmd/**'
-      - 'internal/**'
-      - 'pkg/**'
-      - 'go.mod'
-      - 'go.sum'
+    tags: ['v*']
   release:
     types: [published]
   workflow_dispatch:
