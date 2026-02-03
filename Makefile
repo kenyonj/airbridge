@@ -42,9 +42,17 @@ fmt:
 lint:
 	golangci-lint run
 
-# Docker build
+# Docker
+DOCKER_IMAGE=ghcr.io/kenyonj/airbridge
+
 docker-build:
-	docker build -t airbridge:latest .
+	docker build -t $(DOCKER_IMAGE):latest .
+
+docker-run:
+	docker run --rm --network=host -v airbridge-data:/data $(DOCKER_IMAGE):latest
+
+docker-push:
+	docker push $(DOCKER_IMAGE):latest
 
 # Install dependencies for CGO (libraop)
 setup-libraop:
