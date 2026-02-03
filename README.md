@@ -18,7 +18,8 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 - 📡 Automatic AirPlay device discovery (mDNS)
 - ⚙️ YAML configuration for device filtering and aliases
 - 🔊 Volume control support
-- 🐳 Docker deployment ready (coming soon)
+- 🌐 Web admin interface for managing devices
+- 🐳 Docker deployment with Unraid support
 
 ## Status
 
@@ -26,7 +27,17 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 
 ## Quick Start
 
-### 1. Download cliraop binary
+### Option 1: Docker (Recommended)
+
+```bash
+docker run -d --network=host -v airbridge-data:/data ghcr.io/kenyonj/airbridge:latest
+```
+
+Access the web admin at `http://localhost:8200/admin`
+
+### Option 2: Build from Source
+
+#### 1. Download cliraop binary
 
 Get the pre-built `cliraop` binary for your platform from [libraop releases](https://github.com/philippe44/libraop/releases) and place it in the `bin/` directory:
 
@@ -37,13 +48,13 @@ mkdir -p bin
 chmod +x bin/cliraop-*
 ```
 
-### 2. Build airbridge
+#### 2. Build airbridge
 
 ```bash
 make build
 ```
 
-### 3. Run
+#### 3. Run
 
 **Bridge all discovered AirPlay devices:**
 ```bash
@@ -66,6 +77,8 @@ make build
 Usage of ./bin/airbridge:
   -config string
       Path to config file
+  -db string
+      Path to SQLite database (default "./airbridge.db")
   -port int
       HTTP port for DLNA server (default 8200)
   -serve
@@ -78,6 +91,8 @@ Usage of ./bin/airbridge:
       Test streaming to device (by name)
   -version
       Print version
+  -web
+      Run with web admin interface
 ```
 
 ## Configuration
@@ -139,10 +154,35 @@ devices:
 
 ## Use with Music Assistant
 
-1. Start airbridge: `./bin/airbridge --serve-all`
+1. Start airbridge: `./bin/airbridge --serve-all` or `./bin/airbridge --web`
 2. In Music Assistant, go to Settings → Players
 3. You should see "Airbridge (Device Name)" devices appear as DLNA players
 4. Select a device and start playing music!
+
+## Docker
+
+### Run with Docker
+
+```bash
+# Run with web admin interface
+docker run -d --network=host -v airbridge-data:/data ghcr.io/kenyonj/airbridge:latest
+
+# Or run in serve-all mode (no web UI)
+docker run -d --network=host ghcr.io/kenyonj/airbridge:latest --serve-all
+```
+
+**Note:** Host network mode is required for mDNS device discovery and SSDP announcements.
+
+### Unraid
+
+Airbridge is available in the Unraid Community Applications store. Search for "Airbridge" or manually install using the template at `unraid/airbridge.xml`.
+
+### Build Docker Image Locally
+
+```bash
+make docker-build
+make docker-run
+```
 
 ## Development
 
@@ -165,16 +205,20 @@ make clean      # Clean build artifacts
 .
 ├── cmd/airbridge/       # Main application entry point
 ├── internal/
+│   ├── bridge/          # Unified DLNA bridge with embedded devices
+│   ├── database/        # SQLite database for web mode
 │   ├── discovery/       # mDNS-based AirPlay discovery
 │   ├── httpserver/      # HTTP server for UPnP endpoints
 │   ├── player/          # RAOP player implementation
 │   ├── renderer/        # Multi-device renderer manager
 │   ├── ssdp/            # SSDP announcement/discovery
 │   ├── state/           # Playback state management
-│   └── upnp/            # UPnP/DLNA SOAP handlers
-└── pkg/
-    ├── config/          # YAML configuration
-    └── raop/            # cliraop subprocess wrapper
+│   ├── upnp/            # UPnP/DLNA SOAP handlers
+│   └── web/             # Web admin interface
+├── pkg/
+│   ├── config/          # YAML configuration
+│   └── raop/            # cliraop subprocess wrapper
+└── unraid/              # Unraid Community Apps template
 ```
 
 ## Tested With
