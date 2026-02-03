@@ -81,9 +81,12 @@ sed -i '' "s/Version: [0-9]*\.[0-9]*\.[0-9]*/Version: ${VERSION_NUM}/" cmd/airbr
 # Update airbridge/config.yaml
 sed -i '' "s/^version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"${VERSION_NUM}\"/" airbridge/config.yaml
 
+# Update internal/web/server.go (web UI version)
+sed -i '' "s/const Version = \"[0-9]*\.[0-9]*\.[0-9]*\"/const Version = \"${VERSION_NUM}\"/" internal/web/server.go
+
 # Commit version bump
 echo "Committing version bump..."
-git add cmd/airbridge/main.go airbridge/config.yaml
+git add cmd/airbridge/main.go airbridge/config.yaml internal/web/server.go
 git commit -m "Bump version to ${NEW_VERSION}"
 git push origin main
 

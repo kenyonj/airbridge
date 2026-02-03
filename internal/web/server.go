@@ -17,7 +17,7 @@ import (
 )
 
 // Version is the current Airbridge version, displayed in the web UI.
-const Version = "0.0.3"
+const Version = "0.0.4"
 
 //go:embed templates/*.html
 var templateFS embed.FS
