@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'homeassistant/**'
+      - 'airbridge/**'
       - 'cmd/**'
       - 'internal/**'
       - 'pkg/**'
@@ -45,14 +45,14 @@ jobs:
       - name: Extract version from config.yaml
         id: version
         run: |
-          VERSION=$(grep '^version:' homeassistant/airbridge/config.yaml | sed 's/version: *"\(.*\)"/\1/')
+          VERSION=$(grep '^version:' airbridge/config.yaml | sed 's/version: *"\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: homeassistant/airbridge/Dockerfile
+          file: airbridge/Dockerfile
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/airbridge-ha-${{ matrix.arch }}:${{ steps.version.outputs.version }}
