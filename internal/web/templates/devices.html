@@ -1,0 +1,62 @@
+<!-- Filter -->
+{{if .Models}}
+<div class="mb-4 flex items-center space-x-2">
+    <label class="text-sm text-gray-600">Filter by type:</label>
+    <select 
+        hx-get="/admin/devices"
+        hx-target="#device-list"
+        hx-swap="innerHTML"
+        name="model"
+        class="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        <option value="">All devices</option>
+        {{range .Models}}
+        <option value="{{.}}" {{if eq . $.FilterModel}}selected{{end}}>{{.}}</option>
+        {{end}}
+    </select>
+    {{if .FilterModel}}
+    <button 
+        hx-get="/admin/devices"
+        hx-target="#device-list"
+        hx-swap="innerHTML"
+        class="text-xs text-indigo-600 hover:underline">
+        Clear filter
+    </button>
+    {{end}}
+</div>
+{{end}}
+
+{{if .Devices}}
+<div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+    {{range .Devices}}
+    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition-colors">
+        <div class="flex justify-between items-start">
+            <div>
+                <div class="font-medium text-gray-800">{{.Name}}</div>
+                <div class="text-sm text-gray-500">{{.Host}}:{{.Port}}</div>
+                <div class="text-xs text-gray-400 mt-1">{{.Model}}</div>
+            </div>
+            {{if .Configured}}
+            <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Configured</span>
+            {{else}}
+            <form hx-post="/admin/renderers" hx-target="body" hx-swap="outerHTML" class="inline">
+                <input type="hidden" name="device_id" value="{{.DeviceID}}">
+                <input type="hidden" name="name" value="{{.Name}}">
+                <button type="submit" class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    Add
+                </button>
+            </form>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+</div>
+{{else}}
+<div class="text-center py-8 text-gray-500">
+    {{if .FilterModel}}
+    <p>No devices matching "{{.FilterModel}}".</p>
+    {{else}}
+    <p>No AirPlay devices found.</p>
+    <p class="text-sm">Make sure your AirPlay devices are on the same network.</p>
+    {{end}}
+</div>
+{{end}}

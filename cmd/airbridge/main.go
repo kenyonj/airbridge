@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kenyonj/airbridge/internal/bridge"
+	"github.com/kenyonj/airbridge/internal/database"
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/httpserver"
 	"github.com/kenyonj/airbridge/internal/player"
@@ -21,6 +23,7 @@ import (
 	"github.com/kenyonj/airbridge/internal/ssdp"
 	"github.com/kenyonj/airbridge/internal/state"
 	"github.com/kenyonj/airbridge/internal/upnp"
+	"github.com/kenyonj/airbridge/internal/web"
 	"github.com/kenyonj/airbridge/pkg/config"
 	"github.com/kenyonj/airbridge/pkg/raop"
 )
@@ -40,8 +43,10 @@ func main() {
 	testStream := flag.String("test", "", "Test streaming to device (by name or IP:port)")
 	serve := flag.Bool("serve", false, "Run as DLNA renderer server (single device)")
 	serveAll := flag.Bool("serve-all", false, "Run as DLNA renderer server (all devices)")
+	webMode := flag.Bool("web", false, "Run with web admin interface")
 	target := flag.String("target", "", "Target AirPlay device name (for serve mode)")
 	port := flag.Int("port", 8200, "HTTP port for DLNA server")
+	dbPath := flag.String("db", "./airbridge.db", "Path to SQLite database")
 	configPath := flag.String("config", "", "Path to config file")
 	flag.Parse()
 
@@ -69,6 +74,12 @@ func main() {
 	// Multi-device server mode
 	if *serveAll {
 		runMultiDeviceServer(ctx, *configPath, *port)
+		return
+	}
+
+	// Web admin mode
+	if *webMode {
+		runWebServer(ctx, *dbPath, *port)
 		return
 	}
 
@@ -401,4 +412,77 @@ func printStatus(mgr *renderer.Manager) {
 	fmt.Println("Cast audio to any of these devices from Music Assistant or other DLNA controllers.")
 	fmt.Println("Press Ctrl+C to stop.")
 	fmt.Println()
+}
+
+// runWebServer starts the web admin interface.
+func runWebServer(ctx context.Context, dbPath string, httpPort int) {
+	fmt.Printf("Starting Airbridge with web admin on port %d\n", httpPort)
+	fmt.Printf("Database: %s\n\n", dbPath)
+
+	// Open database
+	db, err := database.Open(dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Start device discovery
+	disco := discovery.NewService()
+	if err := disco.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start discovery: %v\n", err)
+		os.Exit(1)
+	}
+	defer disco.Stop()
+
+	// Wait for initial discovery
+	fmt.Println("Discovering AirPlay devices...")
+	time.Sleep(3 * time.Second)
+
+	// Create and start unified bridge (DLNA server with embedded devices)
+	br := bridge.NewBridge(db, disco, httpPort+1)
+	if err := br.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start bridge: %v\n", err)
+		os.Exit(1)
+	}
+	defer br.Stop()
+
+	// Create web server
+	webServer, err := web.NewServer(db, disco, br, httpPort+1)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create web server: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Setup HTTP server for web admin
+	mux := http.NewServeMux()
+	webServer.RegisterRoutes(mux)
+
+	// Root redirect to admin
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/admin", http.StatusFound)
+			return
+		}
+		http.NotFound(w, r)
+	})
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", httpPort),
+		Handler: httpserver.LogMiddleware(mux),
+	}
+
+	go func() {
+		fmt.Printf("\n🌐 Web admin: http://localhost:%d/admin\n", httpPort)
+		fmt.Printf("📡 DLNA bridge: http://localhost:%d/device.xml\n", httpPort+1)
+		fmt.Println("Press Ctrl+C to stop.\n")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "HTTP server error: %v\n", err)
+		}
+	}()
+
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(shutdownCtx)
 }

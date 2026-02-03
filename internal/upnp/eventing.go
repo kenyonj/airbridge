@@ -3,6 +3,7 @@ package upnp
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"html"
 	"log"
@@ -27,7 +28,6 @@ type Subscription struct {
 type EventManager struct {
 	mu            sync.RWMutex
 	subscriptions map[string]*Subscription // keyed by SID
-	nextSeq       uint32
 }
 
 // NewEventManager creates a new event manager.
@@ -35,6 +35,14 @@ func NewEventManager() *EventManager {
 	return &EventManager{
 		subscriptions: make(map[string]*Subscription),
 	}
+}
+
+// generateSID creates a globally unique subscription ID.
+func generateSID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return fmt.Sprintf("uuid:%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 // Subscribe handles a SUBSCRIBE request and returns the SID.
@@ -55,9 +63,8 @@ func (em *EventManager) Subscribe(r *http.Request, serviceID string) (sid string
 		fmt.Sscanf(to, "Second-%d", &timeoutSec)
 	}
 
-	// Generate SID
-	em.nextSeq++
-	sid = fmt.Sprintf("uuid:event-sub-%d", em.nextSeq)
+	// Generate globally unique SID
+	sid = generateSID()
 
 	sub := &Subscription{
 		SID:       sid,

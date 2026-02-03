@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Airbridge</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [hx-indicator] .htmx-indicator {
+            opacity: 0;
+            transition: opacity 200ms ease-in;
+        }
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+        .htmx-request.htmx-indicator {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-indigo-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-xl font-bold">🌉 Airbridge</h1>
+                    <span class="text-indigo-200 text-sm">DLNA → AirPlay Bridge</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/admin" class="hover:text-indigo-200">Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        {{template "content" .}}
+    </main>
+
+    <footer class="text-center text-gray-500 text-sm py-4">
+        Airbridge v1.0 • <a href="https://github.com/kenyonj/airbridge" class="text-indigo-600 hover:underline">GitHub</a>
+    </footer>
+</body>
+</html>

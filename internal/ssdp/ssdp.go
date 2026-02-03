@@ -25,6 +25,11 @@ const (
 // Announce sends SSDP NOTIFY messages to advertise the device.
 // It runs in a loop until the context is canceled.
 func Announce(ctx context.Context, baseURL, deviceUUID, serverName string) {
+	AnnounceWithLocation(ctx, baseURL, "/device.xml", deviceUUID, serverName)
+}
+
+// AnnounceWithLocation sends SSDP NOTIFY messages with a custom location path.
+func AnnounceWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID, serverName string) {
 	addr, err := net.ResolveUDPAddr("udp4", ssdpAddr)
 	if err != nil {
 		return
@@ -34,6 +39,8 @@ func Announce(ctx context.Context, baseURL, deviceUUID, serverName string) {
 		return
 	}
 	defer conn.Close()
+
+	location := baseURL + locationPath
 
 	targets := []struct{ st, usn string }{
 		{DeviceType, deviceUUID + "::" + DeviceType},
@@ -52,14 +59,14 @@ func Announce(ctx context.Context, baseURL, deviceUUID, serverName string) {
 				"NOTIFY * HTTP/1.1\r\n"+
 					"HOST: %s\r\n"+
 					"CACHE-CONTROL: max-age=%d\r\n"+
-					"LOCATION: %s/device.xml\r\n"+
+					"LOCATION: %s\r\n"+
 					"NT: %s\r\n"+
 					"NTS: ssdp:alive\r\n"+
 					"SERVER: %s\r\n"+
 					"USN: %s\r\n"+
 					"BOOTID.UPNP.ORG: 1\r\n"+
 					"CONFIGID.UPNP.ORG: 1\r\n\r\n",
-				ssdpAddr, cacheMaxAge, baseURL, t.st, serverName, t.usn)
+				ssdpAddr, cacheMaxAge, location, t.st, serverName, t.usn)
 			conn.Write([]byte(msg))
 		}
 	}
@@ -93,6 +100,11 @@ func Announce(ctx context.Context, baseURL, deviceUUID, serverName string) {
 
 // SearchResponder listens for M-SEARCH requests and responds.
 func SearchResponder(ctx context.Context, baseURL, deviceUUID, serverName string) {
+	SearchResponderWithLocation(ctx, baseURL, "/device.xml", deviceUUID, serverName)
+}
+
+// SearchResponderWithLocation listens for M-SEARCH requests and responds with a custom location.
+func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID, serverName string) {
 	addr, err := net.ResolveUDPAddr("udp4", ssdpAddr)
 	if err != nil {
 		return
@@ -102,6 +114,8 @@ func SearchResponder(ctx context.Context, baseURL, deviceUUID, serverName string
 		return
 	}
 	defer conn.Close()
+
+	location := baseURL + locationPath
 
 	if err := conn.SetReadBuffer(65536); err != nil {
 		return
@@ -153,13 +167,13 @@ func SearchResponder(ctx context.Context, baseURL, deviceUUID, serverName string
 				"CACHE-CONTROL: max-age=%d\r\n"+
 				"DATE: %s\r\n"+
 				"EXT:\r\n"+
-				"LOCATION: %s/device.xml\r\n"+
+				"LOCATION: %s\r\n"+
 				"SERVER: %s\r\n"+
 				"ST: %s\r\n"+
 				"USN: %s\r\n"+
 				"BOOTID.UPNP.ORG: 1\r\n"+
 				"CONFIGID.UPNP.ORG: 1\r\n\r\n",
-			cacheMaxAge, time.Now().UTC().Format(time.RFC1123), baseURL, serverName, st, usn)
+			cacheMaxAge, time.Now().UTC().Format(time.RFC1123), location, serverName, st, usn)
 		conn.WriteToUDP([]byte(resp), src)
 	}
 }
