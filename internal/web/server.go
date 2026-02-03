@@ -28,9 +28,10 @@ type Server struct {
 	basePort  int
 }
 
-// DeviceInfo represents an AirPlay device for the UI.
+// DeviceInfo represents a device (AirPlay or Chromecast) for the UI.
 type DeviceInfo struct {
 	DeviceID   string
+	DeviceType string // "airplay" or "chromecast"
 	Name       string
 	Host       string
 	Port       int
@@ -113,40 +114,72 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"TotalCount":   len(renderers),
 		"Uptime":       uptimeStr,
 		"LocalIP":      localIP,
-		"DeviceCount":  len(s.disco.GetDevices()),
+		"DeviceCount":  len(s.disco.GetDevices()) + len(s.disco.GetChromecasts()),
 	}
 
 	s.render(w, "layout.html", data)
 }
 
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
-	devices := s.disco.GetDevices()
+	airplayDevices := s.disco.GetDevices()
+	chromecastDevices := s.disco.GetChromecasts()
 	renderers, _ := s.db.ListRenderers()
 
 	// Get filter from query params
 	filterModel := r.URL.Query().Get("model")
+	filterType := r.URL.Query().Get("type") // "airplay", "chromecast", or ""
 
-	// Build a set of configured device IDs
+	// Build a set of configured device IDs (for both types)
 	configuredIDs := make(map[string]bool)
 	for _, r := range renderers {
 		configuredIDs[r.AirPlayDeviceID] = true
+		if r.DeviceID != "" {
+			configuredIDs[r.DeviceID] = true
+		}
 	}
 
 	// Collect unique models for filter dropdown
 	modelSet := make(map[string]bool)
 
-	// Convert to DeviceInfo
+	// Convert AirPlay devices to DeviceInfo
 	var deviceInfos []DeviceInfo
-	for _, d := range devices {
+	for _, d := range airplayDevices {
 		modelSet[d.Model] = true
 
-		// Apply filter
+		// Apply filters
 		if filterModel != "" && d.Model != filterModel {
+			continue
+		}
+		if filterType != "" && filterType != "airplay" {
 			continue
 		}
 
 		deviceInfos = append(deviceInfos, DeviceInfo{
 			DeviceID:   d.DeviceID,
+			DeviceType: "airplay",
+			Name:       d.Name,
+			Host:       d.Host,
+			Port:       d.Port,
+			Model:      d.Model,
+			Configured: configuredIDs[d.DeviceID],
+		})
+	}
+
+	// Convert Chromecast devices to DeviceInfo
+	for _, d := range chromecastDevices {
+		modelSet[d.Model] = true
+
+		// Apply filters
+		if filterModel != "" && d.Model != filterModel {
+			continue
+		}
+		if filterType != "" && filterType != "chromecast" {
+			continue
+		}
+
+		deviceInfos = append(deviceInfos, DeviceInfo{
+			DeviceID:   d.DeviceID,
+			DeviceType: "chromecast",
 			Name:       d.Name,
 			Host:       d.Host,
 			Port:       d.Port,
@@ -223,11 +256,17 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	deviceID := r.FormValue("device_id")
+	deviceType := r.FormValue("device_type")
 	name := r.FormValue("name")
 
 	if deviceID == "" || name == "" {
 		http.Error(w, "Missing device_id or name", http.StatusBadRequest)
 		return
+	}
+
+	// Default to airplay if not specified
+	if deviceType == "" {
+		deviceType = "airplay"
 	}
 
 	// Get next available port
@@ -240,18 +279,33 @@ func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 	// Generate deterministic ID
 	id := generateID(deviceID)
 
-	// Find the device to get its name
-	device := s.disco.GetDevice(deviceID)
-	airplayName := name
-	if device != nil {
-		airplayName = device.Name
+	// Find the device to get its name based on type
+	var deviceName string
+	switch deviceType {
+	case "chromecast":
+		device := s.disco.GetChromecast(deviceID)
+		if device != nil {
+			deviceName = device.Name
+		} else {
+			deviceName = name
+		}
+	default: // "airplay"
+		device := s.disco.GetDevice(deviceID)
+		if device != nil {
+			deviceName = device.Name
+		} else {
+			deviceName = name
+		}
 	}
 
 	renderer := &database.Renderer{
 		ID:              id,
 		Name:            fmt.Sprintf("Airbridge (%s)", name),
-		AirPlayDeviceID: deviceID,
-		AirPlayName:     airplayName,
+		DeviceType:      deviceType,
+		DeviceID:        deviceID,
+		DeviceName:      deviceName,
+		AirPlayDeviceID: deviceID, // For backward compatibility
+		AirPlayName:     deviceName,
 		Port:            port,
 		Enabled:         true,
 		CreatedAt:       time.Now(),
@@ -262,7 +316,7 @@ func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Created renderer: %s -> %s on port %d", renderer.Name, renderer.AirPlayName, renderer.Port)
+	log.Printf("Created %s renderer: %s -> %s on port %d", deviceType, renderer.Name, deviceName, renderer.Port)
 
 	// Start the renderer
 	if err := s.renderers.StartRenderer(renderer.ID); err != nil {

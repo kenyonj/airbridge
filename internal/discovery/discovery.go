@@ -1,4 +1,4 @@
-// Package discovery provides mDNS-based discovery of AirPlay/RAOP devices.
+// Package discovery provides mDNS-based discovery of AirPlay/RAOP and Chromecast devices.
 package discovery
 
 import (
@@ -11,6 +11,14 @@ import (
 	"time"
 
 	"github.com/grandcat/zeroconf"
+)
+
+// DeviceType identifies the type of discovered device.
+type DeviceType string
+
+const (
+	DeviceTypeAirPlay    DeviceType = "airplay"
+	DeviceTypeChromecast DeviceType = "chromecast"
 )
 
 // AirPlayDevice represents a discovered AirPlay device.
@@ -27,16 +35,18 @@ type AirPlayDevice struct {
 
 // Service manages discovery of AirPlay devices on the network.
 type Service struct {
-	devices   map[string]*AirPlayDevice // keyed by DeviceID
-	mu        sync.RWMutex
-	ctx       context.Context
-	cancel    context.CancelFunc
+	devices     map[string]*AirPlayDevice     // keyed by DeviceID
+	chromecasts map[string]*ChromecastDevice  // keyed by DeviceID
+	mu          sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // NewService creates a new discovery service.
 func NewService() *Service {
 	return &Service{
-		devices: make(map[string]*AirPlayDevice),
+		devices:     make(map[string]*AirPlayDevice),
+		chromecasts: make(map[string]*ChromecastDevice),
 	}
 }
 
@@ -45,6 +55,7 @@ func (s *Service) Start(ctx context.Context) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	go s.browseLoop()
+	go s.browseChromecastLoop()
 	return nil
 }
 
@@ -143,6 +154,38 @@ func (s *Service) GetDeviceByName(name string) *AirPlayDevice {
 	return nil
 }
 
+// GetChromecasts returns a copy of all discovered Chromecast devices.
+func (s *Service) GetChromecasts() []*ChromecastDevice {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	devices := make([]*ChromecastDevice, 0, len(s.chromecasts))
+	for _, d := range s.chromecasts {
+		devices = append(devices, d)
+	}
+	return devices
+}
+
+// GetChromecast returns a Chromecast device by its ID.
+func (s *Service) GetChromecast(id string) *ChromecastDevice {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.chromecasts[id]
+}
+
+// GetChromecastByName returns a Chromecast device by its friendly name.
+func (s *Service) GetChromecastByName(name string) *ChromecastDevice {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	for _, d := range s.chromecasts {
+		if strings.EqualFold(d.Name, name) {
+			return d
+		}
+	}
+	return nil
+}
+
 // parseRAOPEntry parses a zeroconf entry into an AirPlayDevice.
 func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *AirPlayDevice {
 	// RAOP instance names are formatted as "DEVICEID@FriendlyName"
@@ -234,4 +277,119 @@ func (d *AirPlayDevice) SupportsALAC() bool {
 		return strings.Contains(cn, "1")
 	}
 	return false
+}
+
+// ChromecastDevice represents a discovered Chromecast device.
+type ChromecastDevice struct {
+	Name      string            // Friendly name (e.g., "Living Room TV")
+	DeviceID  string            // Unique device ID
+	Host      string            // Hostname or IP
+	Port      int               // Cast port (usually 8009)
+	Model     string            // Device model (e.g., "Chromecast")
+	TXTRecord map[string]string // Raw TXT record fields
+	LastSeen  time.Time         // When the device was last discovered
+}
+
+// String returns a human-readable representation of the Chromecast device.
+func (d *ChromecastDevice) String() string {
+	return fmt.Sprintf("%s (%s) at %s:%d [%s]", d.Name, d.DeviceID, d.Host, d.Port, d.Model)
+}
+
+// browseChromecastLoop continuously discovers Chromecast devices.
+func (s *Service) browseChromecastLoop() {
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
+		resolver, err := zeroconf.NewResolver(nil)
+		if err != nil {
+			log.Printf("Failed to create Chromecast resolver: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		entries := make(chan *zeroconf.ServiceEntry)
+		
+		done := make(chan struct{})
+		go func() {
+			for entry := range entries {
+				device := s.parseChromecastEntry(entry)
+				if device != nil {
+					s.mu.Lock()
+					s.chromecasts[device.DeviceID] = device
+					s.mu.Unlock()
+					log.Printf("Discovered Chromecast: %s", device)
+				}
+			}
+			close(done)
+		}()
+
+		browseCtx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+		err = resolver.Browse(browseCtx, "_googlecast._tcp", "local.", entries)
+		if err != nil {
+			log.Printf("Chromecast browse error: %v", err)
+		}
+		
+		<-browseCtx.Done()
+		cancel()
+		<-done
+
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(20 * time.Second):
+		}
+	}
+}
+
+// parseChromecastEntry parses a zeroconf entry into a ChromecastDevice.
+func (s *Service) parseChromecastEntry(entry *zeroconf.ServiceEntry) *ChromecastDevice {
+	// Parse TXT record
+	txtRecord := make(map[string]string)
+	for _, txt := range entry.Text {
+		if idx := strings.Index(txt, "="); idx > 0 {
+			txtRecord[txt[:idx]] = txt[idx+1:]
+		}
+	}
+
+	// Get device ID from TXT record
+	deviceID := txtRecord["id"]
+	if deviceID == "" {
+		// Fall back to instance name if no ID
+		deviceID = entry.Instance
+	}
+
+	// Get friendly name from TXT record (fn = friendly name)
+	friendlyName := txtRecord["fn"]
+	if friendlyName == "" {
+		friendlyName = entry.Instance
+	}
+	friendlyName = cleanMDNSName(friendlyName)
+
+	// Get model from TXT record (md = model description)
+	model := txtRecord["md"]
+	if model == "" {
+		model = "Chromecast"
+	}
+
+	// Get host
+	host := entry.HostName
+	if len(entry.AddrIPv4) > 0 {
+		host = entry.AddrIPv4[0].String()
+	} else if len(entry.AddrIPv6) > 0 {
+		host = entry.AddrIPv6[0].String()
+	}
+
+	return &ChromecastDevice{
+		Name:      friendlyName,
+		DeviceID:  deviceID,
+		Host:      host,
+		Port:      entry.Port,
+		Model:     model,
+		TXTRecord: txtRecord,
+		LastSeen:  time.Now(),
+	}
 }

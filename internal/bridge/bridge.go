@@ -26,14 +26,17 @@ const (
 
 // RendererInstance represents a single embedded renderer.
 type RendererInstance struct {
-	ID           string
-	Name         string
-	AirPlayName  string
-	Device       *discovery.AirPlayDevice
-	State        *state.PlayerState
-	Player       *player.RAOPPlayer
-	EventManager *upnp.EventManager
-	cancel       context.CancelFunc
+	ID            string
+	Name          string
+	DeviceType    string // "airplay" or "chromecast"
+	AirPlayName   string // Legacy: for AirPlay devices
+	DeviceName    string // Generic device name
+	Device        *discovery.AirPlayDevice     // AirPlay device (nil for Chromecast)
+	Chromecast    *discovery.ChromecastDevice  // Chromecast device (nil for AirPlay)
+	State         *state.PlayerState
+	Player        upnp.Player // Generic player interface
+	EventManager  *upnp.EventManager
+	cancel        context.CancelFunc
 }
 
 // Bridge is a unified DLNA bridge with multiple embedded renderers.
@@ -139,29 +142,59 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 		return nil
 	}
 
-	// Find the AirPlay device
-	device := b.disco.GetDevice(r.AirPlayDeviceID)
-	if device == nil {
-		return fmt.Errorf("AirPlay device not found: %s", r.AirPlayDeviceID)
-	}
-
 	// Create renderer context
 	ctx, cancel := context.WithCancel(b.ctx)
 
 	inst := &RendererInstance{
 		ID:           r.ID,
 		Name:         r.Name,
+		DeviceType:   r.DeviceType,
 		AirPlayName:  r.AirPlayName,
-		Device:       device,
+		DeviceName:   r.DeviceName,
 		State:        state.New(ctx),
-		Player:       player.NewRAOPPlayer(device),
 		EventManager: upnp.NewEventManager(),
 		cancel:       cancel,
 	}
 
-	b.renderers[r.ID] = inst
-	log.Printf("Added renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
+	// Get device and create appropriate player based on device type
+	deviceType := r.DeviceType
+	if deviceType == "" {
+		deviceType = "airplay" // Default to AirPlay for legacy renderers
+	}
 
+	switch deviceType {
+	case "chromecast":
+		// Find the Chromecast device
+		device := b.disco.GetChromecast(r.DeviceID)
+		if device == nil {
+			cancel()
+			return fmt.Errorf("Chromecast device not found: %s", r.DeviceID)
+		}
+		inst.Chromecast = device
+		inst.DeviceName = device.Name
+		inst.Player = player.NewChromecastPlayer(device)
+		log.Printf("Added Chromecast renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
+
+	default: // "airplay"
+		// Find the AirPlay device
+		device := b.disco.GetDevice(r.AirPlayDeviceID)
+		if device == nil {
+			// Try using DeviceID if AirPlayDeviceID is empty
+			if r.DeviceID != "" {
+				device = b.disco.GetDevice(r.DeviceID)
+			}
+		}
+		if device == nil {
+			cancel()
+			return fmt.Errorf("AirPlay device not found: %s", r.AirPlayDeviceID)
+		}
+		inst.Device = device
+		inst.AirPlayName = device.Name
+		inst.Player = player.NewRAOPPlayer(device)
+		log.Printf("Added AirPlay renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
+	}
+
+	b.renderers[r.ID] = inst
 	return nil
 }
 

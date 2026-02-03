@@ -271,3 +271,181 @@ func TestService_StartStop(t *testing.T) {
 
 	// Should not panic or hang
 }
+
+// Chromecast discovery tests
+
+func TestService_GetChromecasts_Empty(t *testing.T) {
+	s := NewService()
+	devices := s.GetChromecasts()
+	if len(devices) != 0 {
+		t.Errorf("expected empty list, got %d devices", len(devices))
+	}
+}
+
+func TestService_GetChromecast_NotFound(t *testing.T) {
+	s := NewService()
+	device := s.GetChromecast("nonexistent")
+	if device != nil {
+		t.Error("expected nil for nonexistent device")
+	}
+}
+
+func TestService_GetChromecastByName_NotFound(t *testing.T) {
+	s := NewService()
+	device := s.GetChromecastByName("Living Room TV")
+	if device != nil {
+		t.Error("expected nil for nonexistent device")
+	}
+}
+
+func TestService_ChromecastManualAddAndGet(t *testing.T) {
+	s := NewService()
+
+	// Manually add a Chromecast device
+	device := &ChromecastDevice{
+		Name:     "Living Room TV",
+		DeviceID: "abc123-chromecast",
+		Host:     "192.168.1.101",
+		Port:     8009,
+		Model:    "Chromecast",
+		LastSeen: time.Now(),
+	}
+
+	s.mu.Lock()
+	s.chromecasts[device.DeviceID] = device
+	s.mu.Unlock()
+
+	// Test GetChromecasts
+	devices := s.GetChromecasts()
+	if len(devices) != 1 {
+		t.Fatalf("expected 1 device, got %d", len(devices))
+	}
+	if devices[0].Name != "Living Room TV" {
+		t.Errorf("expected 'Living Room TV', got %q", devices[0].Name)
+	}
+
+	// Test GetChromecast by ID
+	got := s.GetChromecast("abc123-chromecast")
+	if got == nil {
+		t.Fatal("expected device, got nil")
+	}
+	if got.Host != "192.168.1.101" {
+		t.Errorf("expected host 192.168.1.101, got %q", got.Host)
+	}
+
+	// Test GetChromecastByName
+	got = s.GetChromecastByName("Living Room TV")
+	if got == nil {
+		t.Fatal("expected device, got nil")
+	}
+	if got.DeviceID != "abc123-chromecast" {
+		t.Errorf("expected ID abc123-chromecast, got %q", got.DeviceID)
+	}
+
+	// Test case insensitive name lookup
+	got = s.GetChromecastByName("living room tv")
+	if got == nil {
+		t.Error("expected case insensitive match")
+	}
+}
+
+func TestParseChromecastEntry(t *testing.T) {
+	s := NewService()
+
+	// Helper to create ServiceEntry for Chromecast
+	makeEntry := func(instance string, port int, hostName string, text []string) *zeroconf.ServiceEntry {
+		entry := zeroconf.NewServiceEntry(instance, "_googlecast._tcp", "local")
+		entry.Port = port
+		entry.HostName = hostName
+		entry.Text = text
+		return entry
+	}
+
+	tests := []struct {
+		name      string
+		entry     *zeroconf.ServiceEntry
+		wantName  string
+		wantID    string
+		wantModel string
+		wantPort  int
+	}{
+		{
+			name:      "valid entry with TXT records",
+			entry:     makeEntry("Chromecast-abc123", 8009, "chromecast.local", []string{"fn=Living Room TV", "id=abc123", "md=Chromecast"}),
+			wantName:  "Living Room TV",
+			wantID:    "abc123",
+			wantModel: "Chromecast",
+			wantPort:  8009,
+		},
+		{
+			name:      "no fn in TXT uses instance name",
+			entry:     makeEntry("Office-Speaker", 8009, "speaker.local", []string{"id=def456", "md=Google Home"}),
+			wantName:  "Office-Speaker",
+			wantID:    "def456",
+			wantModel: "Google Home",
+			wantPort:  8009,
+		},
+		{
+			name:      "no id in TXT uses instance name",
+			entry:     makeEntry("Kitchen-Display", 8009, "display.local", []string{"fn=Kitchen Display", "md=Nest Hub"}),
+			wantName:  "Kitchen Display",
+			wantID:    "Kitchen-Display",
+			wantModel: "Nest Hub",
+			wantPort:  8009,
+		},
+		{
+			name:      "no md defaults to Chromecast",
+			entry:     makeEntry("Unknown-Device", 8009, "unknown.local", []string{"fn=Unknown", "id=ghi789"}),
+			wantName:  "Unknown",
+			wantID:    "ghi789",
+			wantModel: "Chromecast",
+			wantPort:  8009,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := s.parseChromecastEntry(tt.entry)
+			if got == nil {
+				t.Fatal("expected device, got nil")
+			}
+			if got.Name != tt.wantName {
+				t.Errorf("Name = %q, want %q", got.Name, tt.wantName)
+			}
+			if got.DeviceID != tt.wantID {
+				t.Errorf("DeviceID = %q, want %q", got.DeviceID, tt.wantID)
+			}
+			if got.Model != tt.wantModel {
+				t.Errorf("Model = %q, want %q", got.Model, tt.wantModel)
+			}
+			if got.Port != tt.wantPort {
+				t.Errorf("Port = %d, want %d", got.Port, tt.wantPort)
+			}
+		})
+	}
+}
+
+func TestChromecastDevice_String(t *testing.T) {
+	d := &ChromecastDevice{
+		Name:     "Living Room TV",
+		DeviceID: "abc123",
+		Host:     "192.168.1.101",
+		Port:     8009,
+		Model:    "Chromecast",
+	}
+
+	s := d.String()
+	expected := "Living Room TV (abc123) at 192.168.1.101:8009 [Chromecast]"
+	if s != expected {
+		t.Errorf("String() = %q, want %q", s, expected)
+	}
+}
+
+func TestDeviceType_Constants(t *testing.T) {
+	if DeviceTypeAirPlay != "airplay" {
+		t.Errorf("DeviceTypeAirPlay = %q, want 'airplay'", DeviceTypeAirPlay)
+	}
+	if DeviceTypeChromecast != "chromecast" {
+		t.Errorf("DeviceTypeChromecast = %q, want 'chromecast'", DeviceTypeChromecast)
+	}
+}

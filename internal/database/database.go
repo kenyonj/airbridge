@@ -21,8 +21,11 @@ type DB struct {
 type Renderer struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
-	AirPlayDeviceID string    `json:"airplay_device_id"`
-	AirPlayName     string    `json:"airplay_name"`
+	DeviceType      string    `json:"device_type"`       // "airplay" or "chromecast"
+	AirPlayDeviceID string    `json:"airplay_device_id"` // Legacy: device ID for AirPlay
+	DeviceID        string    `json:"device_id"`         // Generic device ID
+	AirPlayName     string    `json:"airplay_name"`      // Legacy: AirPlay device name
+	DeviceName      string    `json:"device_name"`       // Generic device name
 	Port            int       `json:"port"`
 	Enabled         bool      `json:"enabled"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -79,14 +82,43 @@ func (db *DB) migrate() error {
 		}
 	}
 
+	// Add device_type column if it doesn't exist (defaults to 'airplay' for existing rows)
+	db.addColumnIfNotExists("renderers", "device_type", "TEXT NOT NULL DEFAULT 'airplay'")
+	// Add generic device_id column
+	db.addColumnIfNotExists("renderers", "device_id", "TEXT NOT NULL DEFAULT ''")
+	// Add generic device_name column
+	db.addColumnIfNotExists("renderers", "device_name", "TEXT NOT NULL DEFAULT ''")
+
 	log.Println("Database migrations complete")
 	return nil
+}
+
+// addColumnIfNotExists adds a column to a table if it doesn't already exist.
+func (db *DB) addColumnIfNotExists(table, column, colType string) {
+	// Check if column exists
+	var count int
+	err := db.conn.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`,
+		table, column,
+	).Scan(&count)
+	if err != nil || count > 0 {
+		return // Column exists or error checking
+	}
+
+	// Add the column
+	_, err = db.conn.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s %s`, table, column, colType))
+	if err != nil {
+		log.Printf("Failed to add column %s.%s: %v", table, column, err)
+	}
 }
 
 // ListRenderers returns all configured renderers.
 func (db *DB) ListRenderers() ([]Renderer, error) {
 	rows, err := db.conn.Query(`
-		SELECT id, name, airplay_device_id, airplay_name, port, enabled, created_at 
+		SELECT id, name, airplay_device_id, airplay_name, port, enabled, created_at,
+		       COALESCE(device_type, 'airplay') as device_type,
+		       COALESCE(device_id, '') as device_id,
+		       COALESCE(device_name, '') as device_name
 		FROM renderers 
 		ORDER BY created_at ASC
 	`)
@@ -99,10 +131,18 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 	for rows.Next() {
 		var r Renderer
 		var enabled int
-		if err := rows.Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
+			&r.DeviceType, &r.DeviceID, &r.DeviceName); err != nil {
 			return nil, err
 		}
 		r.Enabled = enabled == 1
+		// Backfill generic fields from legacy fields if empty
+		if r.DeviceID == "" {
+			r.DeviceID = r.AirPlayDeviceID
+		}
+		if r.DeviceName == "" {
+			r.DeviceName = r.AirPlayName
+		}
 		renderers = append(renderers, r)
 	}
 	return renderers, rows.Err()
@@ -113,9 +153,13 @@ func (db *DB) GetRenderer(id string) (*Renderer, error) {
 	var r Renderer
 	var enabled int
 	err := db.conn.QueryRow(`
-		SELECT id, name, airplay_device_id, airplay_name, port, enabled, created_at 
+		SELECT id, name, airplay_device_id, airplay_name, port, enabled, created_at,
+		       COALESCE(device_type, 'airplay') as device_type,
+		       COALESCE(device_id, '') as device_id,
+		       COALESCE(device_name, '') as device_name
 		FROM renderers WHERE id = ?
-	`, id).Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt)
+	`, id).Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
+		&r.DeviceType, &r.DeviceID, &r.DeviceName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -123,6 +167,13 @@ func (db *DB) GetRenderer(id string) (*Renderer, error) {
 		return nil, err
 	}
 	r.Enabled = enabled == 1
+	// Backfill generic fields from legacy fields if empty
+	if r.DeviceID == "" {
+		r.DeviceID = r.AirPlayDeviceID
+	}
+	if r.DeviceName == "" {
+		r.DeviceName = r.AirPlayName
+	}
 	return &r, nil
 }
 
@@ -132,10 +183,24 @@ func (db *DB) CreateRenderer(r *Renderer) error {
 	if r.Enabled {
 		enabled = 1
 	}
+	// Default device type to airplay if not set
+	deviceType := r.DeviceType
+	if deviceType == "" {
+		deviceType = "airplay"
+	}
+	// Use generic fields, falling back to legacy fields
+	deviceID := r.DeviceID
+	if deviceID == "" {
+		deviceID = r.AirPlayDeviceID
+	}
+	deviceName := r.DeviceName
+	if deviceName == "" {
+		deviceName = r.AirPlayName
+	}
 	_, err := db.conn.Exec(`
-		INSERT INTO renderers (id, name, airplay_device_id, airplay_name, port, enabled, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, r.ID, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, r.CreatedAt)
+		INSERT INTO renderers (id, name, airplay_device_id, airplay_name, port, enabled, created_at, device_type, device_id, device_name)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, r.ID, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, r.CreatedAt, deviceType, deviceID, deviceName)
 	return err
 }
 
@@ -145,10 +210,23 @@ func (db *DB) UpdateRenderer(r *Renderer) error {
 	if r.Enabled {
 		enabled = 1
 	}
+	deviceType := r.DeviceType
+	if deviceType == "" {
+		deviceType = "airplay"
+	}
+	deviceID := r.DeviceID
+	if deviceID == "" {
+		deviceID = r.AirPlayDeviceID
+	}
+	deviceName := r.DeviceName
+	if deviceName == "" {
+		deviceName = r.AirPlayName
+	}
 	_, err := db.conn.Exec(`
-		UPDATE renderers SET name = ?, airplay_device_id = ?, airplay_name = ?, port = ?, enabled = ?
+		UPDATE renderers SET name = ?, airplay_device_id = ?, airplay_name = ?, port = ?, enabled = ?,
+		       device_type = ?, device_id = ?, device_name = ?
 		WHERE id = ?
-	`, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, r.ID)
+	`, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, deviceType, deviceID, deviceName, r.ID)
 	return err
 }
 
