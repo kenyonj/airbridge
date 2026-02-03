@@ -1,3 +1,6 @@
+# Global ARG for Home Assistant base image
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:16.0.1
+
 # Build cliraop from source
 FROM debian:bookworm-slim AS cliraop-builder
 
@@ -27,7 +30,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /airbridge ./cmd/airbridge
 
 # Final image using Home Assistant base
-ARG BUILD_FROM=ghcr.io/hassio-addons/base:16.0.1
+ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 # Copy binaries from build stages
