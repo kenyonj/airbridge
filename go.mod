@@ -11,6 +11,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	cloud.google.com/go/longrunning v0.6.3 // indirect
 	cloud.google.com/go/texttospeech v1.10.0 // indirect
+	github.com/andrewtj/dnssd v0.0.0-20161222030342-242ed8d297c8 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -23,9 +24,14 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.0 // indirect
+	github.com/guelfey/go.dbus v0.0.0-20220105183920-7084538c37af // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jroimartin/gocui v0.5.0 // indirect
+	github.com/maghul/go.alac v0.0.0-20161106215514-129591bceef4 // indirect
+	github.com/maghul/go.dnssd v0.0.0-20161106215808-721e571d0ad2 // indirect
+	github.com/maghul/go.raopd v0.0.0-20161110000027-3b56c241c117 // indirect
+	github.com/maghul/go.slf v0.0.0-20161109233938-61ad54d83707 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
