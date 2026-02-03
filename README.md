@@ -23,7 +23,18 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 
 ## Status
 
-✅ **Working** - Core functionality complete. Ready for testing.
+⚠️ **Early Development (v0.x)** - Core functionality works but expect breaking changes, bugs, and missing features. Not yet recommended for production use.
+
+### What works:
+- DLNA renderer creation and discovery
+- Audio streaming to AirPlay devices
+- Web admin interface
+- Docker/Unraid/Home Assistant deployment
+
+### Planned:
+- Chromecast support ([#1](https://github.com/kenyonj/airbridge/issues/1), [#2](https://github.com/kenyonj/airbridge/issues/2))
+- Spotify Connect support ([#3](https://github.com/kenyonj/airbridge/issues/3))
+- Tests and CI ([#4](https://github.com/kenyonj/airbridge/issues/4))
 
 ## Quick Start
 
