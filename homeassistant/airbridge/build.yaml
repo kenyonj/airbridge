@@ -1,0 +1,9 @@
+build_from:
+  amd64: ghcr.io/hassio-addons/base:16.0.1
+args:
+  BUILD_FROM: ghcr.io/hassio-addons/base:16.0.1
+labels:
+  org.opencontainers.image.title: Airbridge
+  org.opencontainers.image.description: Bridge DLNA/UPnP audio streams to AirPlay devices
+  org.opencontainers.image.source: https://github.com/kenyonj/airbridge
+  org.opencontainers.image.licenses: MIT

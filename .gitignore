@@ -37,7 +37,7 @@ config.local.yaml
 *.log
 
 # Local build artifacts
-airbridge
+/airbridge
 
 # SQLite database
 *.db
