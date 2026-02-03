@@ -494,7 +494,7 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 	go func() {
 		fmt.Printf("\n🌐 Web admin: http://localhost:%d/admin\n", httpPort)
 		fmt.Printf("📡 DLNA bridge: http://localhost:%d/device.xml\n", httpPort+1)
-		fmt.Println("Press Ctrl+C to stop.\n")
+		fmt.Println("Press Ctrl+C to stop.")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "HTTP server error: %v\n", err)
 		}
