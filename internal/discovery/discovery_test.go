@@ -46,13 +46,14 @@ func TestService_ManualAddAndGet(t *testing.T) {
 	s := NewService()
 
 	// Manually add a device (simulating what browseLoop does)
-	device := &AirPlayDevice{
-		Name:     "Living Room",
-		DeviceID: "C6F4891B35E7",
-		Host:     "192.168.1.100",
-		Port:     7000,
-		Model:    "Shairport Sync",
-		LastSeen: time.Now(),
+	device := &Device{
+		Name:       "Living Room",
+		DeviceID:   "C6F4891B35E7",
+		DeviceType: DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
+		Model:      "Shairport Sync",
+		LastSeen:   time.Now(),
 	}
 
 	s.mu.Lock()
@@ -195,16 +196,17 @@ func TestCleanMDNSName(t *testing.T) {
 }
 
 func TestAirPlayDevice_String(t *testing.T) {
-	d := &AirPlayDevice{
-		Name:     "Living Room",
-		DeviceID: "C6F4891B35E7",
-		Host:     "192.168.1.100",
-		Port:     7000,
-		Model:    "Shairport Sync",
+	d := &Device{
+		Name:       "Living Room",
+		DeviceID:   "C6F4891B35E7",
+		DeviceType: DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
+		Model:      "Shairport Sync",
 	}
 
 	s := d.String()
-	expected := "Living Room (C6F4891B35E7) at 192.168.1.100:7000 [Shairport Sync]"
+	expected := "Living Room (C6F4891B35E7) at 192.168.1.100:7000 [Shairport Sync, airplay]"
 	if s != expected {
 		t.Errorf("String() = %q, want %q", s, expected)
 	}
@@ -223,7 +225,7 @@ func TestAirPlayDevice_EncryptionTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &AirPlayDevice{TXTRecord: tt.txtRecord}
+			d := &Device{DeviceType: DeviceTypeAirPlay, TXTRecord: tt.txtRecord}
 			got := d.EncryptionTypes()
 			if got != tt.want {
 				t.Errorf("EncryptionTypes() = %q, want %q", got, tt.want)
@@ -245,7 +247,7 @@ func TestAirPlayDevice_SupportsALAC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &AirPlayDevice{TXTRecord: tt.txtRecord}
+			d := &Device{DeviceType: DeviceTypeAirPlay, TXTRecord: tt.txtRecord}
 			got := d.SupportsALAC()
 			if got != tt.want {
 				t.Errorf("SupportsALAC() = %v, want %v", got, tt.want)
@@ -274,25 +276,25 @@ func TestService_StartStop(t *testing.T) {
 
 // Chromecast discovery tests
 
-func TestService_GetChromecasts_Empty(t *testing.T) {
+func TestService_GetChromecastDevices_Empty(t *testing.T) {
 	s := NewService()
-	devices := s.GetChromecasts()
+	devices := s.GetDevicesByType(DeviceTypeChromecast)
 	if len(devices) != 0 {
 		t.Errorf("expected empty list, got %d devices", len(devices))
 	}
 }
 
-func TestService_GetChromecast_NotFound(t *testing.T) {
+func TestService_GetChromecastDevice_NotFound(t *testing.T) {
 	s := NewService()
-	device := s.GetChromecast("nonexistent")
+	device := s.GetDevice("nonexistent")
 	if device != nil {
 		t.Error("expected nil for nonexistent device")
 	}
 }
 
-func TestService_GetChromecastByName_NotFound(t *testing.T) {
+func TestService_GetChromecastDeviceByName_NotFound(t *testing.T) {
 	s := NewService()
-	device := s.GetChromecastByName("Living Room TV")
+	device := s.GetDeviceByName("Living Room TV")
 	if device != nil {
 		t.Error("expected nil for nonexistent device")
 	}
@@ -302,21 +304,22 @@ func TestService_ChromecastManualAddAndGet(t *testing.T) {
 	s := NewService()
 
 	// Manually add a Chromecast device
-	device := &ChromecastDevice{
-		Name:     "Living Room TV",
-		DeviceID: "abc123-chromecast",
-		Host:     "192.168.1.101",
-		Port:     8009,
-		Model:    "Chromecast",
-		LastSeen: time.Now(),
+	device := &Device{
+		Name:       "Living Room TV",
+		DeviceID:   "abc123-chromecast",
+		DeviceType: DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
+		Model:      "Chromecast",
+		LastSeen:   time.Now(),
 	}
 
 	s.mu.Lock()
-	s.chromecasts[device.DeviceID] = device
+	s.devices[device.DeviceID] = device
 	s.mu.Unlock()
 
-	// Test GetChromecasts
-	devices := s.GetChromecasts()
+	// Test GetDevicesByType for Chromecast
+	devices := s.GetDevicesByType(DeviceTypeChromecast)
 	if len(devices) != 1 {
 		t.Fatalf("expected 1 device, got %d", len(devices))
 	}
@@ -324,8 +327,8 @@ func TestService_ChromecastManualAddAndGet(t *testing.T) {
 		t.Errorf("expected 'Living Room TV', got %q", devices[0].Name)
 	}
 
-	// Test GetChromecast by ID
-	got := s.GetChromecast("abc123-chromecast")
+	// Test GetDevice by ID
+	got := s.GetDevice("abc123-chromecast")
 	if got == nil {
 		t.Fatal("expected device, got nil")
 	}
@@ -333,8 +336,8 @@ func TestService_ChromecastManualAddAndGet(t *testing.T) {
 		t.Errorf("expected host 192.168.1.101, got %q", got.Host)
 	}
 
-	// Test GetChromecastByName
-	got = s.GetChromecastByName("Living Room TV")
+	// Test GetDeviceByName
+	got = s.GetDeviceByName("Living Room TV")
 	if got == nil {
 		t.Fatal("expected device, got nil")
 	}
@@ -343,7 +346,7 @@ func TestService_ChromecastManualAddAndGet(t *testing.T) {
 	}
 
 	// Test case insensitive name lookup
-	got = s.GetChromecastByName("living room tv")
+	got = s.GetDeviceByName("living room tv")
 	if got == nil {
 		t.Error("expected case insensitive match")
 	}
@@ -426,16 +429,17 @@ func TestParseChromecastEntry(t *testing.T) {
 }
 
 func TestChromecastDevice_String(t *testing.T) {
-	d := &ChromecastDevice{
-		Name:     "Living Room TV",
-		DeviceID: "abc123",
-		Host:     "192.168.1.101",
-		Port:     8009,
-		Model:    "Chromecast",
+	d := &Device{
+		Name:       "Living Room TV",
+		DeviceID:   "abc123",
+		DeviceType: DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
+		Model:      "Chromecast",
 	}
 
 	s := d.String()
-	expected := "Living Room TV (abc123) at 192.168.1.101:8009 [Chromecast]"
+	expected := "Living Room TV (abc123) at 192.168.1.101:8009 [Chromecast, chromecast]"
 	if s != expected {
 		t.Errorf("String() = %q, want %q", s, expected)
 	}

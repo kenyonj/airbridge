@@ -3,7 +3,6 @@ package discovery
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -21,32 +20,18 @@ const (
 	DeviceTypeChromecast DeviceType = "chromecast"
 )
 
-// AirPlayDevice represents a discovered AirPlay device.
-type AirPlayDevice struct {
-	Name      string            // Friendly name (e.g., "Kitchen")
-	DeviceID  string            // MAC address-based ID (e.g., "C6F4891B35E7")
-	Host      string            // Hostname or IP
-	Port      int               // RAOP port
-	Model     string            // Device model (e.g., "Shairport Sync")
-	Features  uint64            // Feature flags
-	TXTRecord map[string]string // Raw TXT record fields
-	LastSeen  time.Time         // When the device was last discovered
-}
-
-// Service manages discovery of AirPlay devices on the network.
+// Service manages discovery of AirPlay and Chromecast devices on the network.
 type Service struct {
-	devices     map[string]*AirPlayDevice    // keyed by DeviceID
-	chromecasts map[string]*ChromecastDevice // keyed by DeviceID
-	mu          sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
+	devices map[string]*Device // keyed by DeviceID, contains all device types
+	mu      sync.RWMutex
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 // NewService creates a new discovery service.
 func NewService() *Service {
 	return &Service{
-		devices:     make(map[string]*AirPlayDevice),
-		chromecasts: make(map[string]*ChromecastDevice),
+		devices: make(map[string]*Device),
 	}
 }
 
@@ -122,12 +107,12 @@ func (s *Service) Stop() {
 	}
 }
 
-// GetDevices returns a copy of all discovered devices.
-func (s *Service) GetDevices() []*AirPlayDevice {
+// GetDevices returns all discovered devices.
+func (s *Service) GetDevices() []*Device {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	devices := make([]*AirPlayDevice, 0, len(s.devices))
+	devices := make([]*Device, 0, len(s.devices))
 	for _, d := range s.devices {
 		devices = append(devices, d)
 	}
@@ -135,14 +120,14 @@ func (s *Service) GetDevices() []*AirPlayDevice {
 }
 
 // GetDevice returns a device by its ID.
-func (s *Service) GetDevice(id string) *AirPlayDevice {
+func (s *Service) GetDevice(id string) *Device {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.devices[id]
 }
 
 // GetDeviceByName returns a device by its friendly name.
-func (s *Service) GetDeviceByName(name string) *AirPlayDevice {
+func (s *Service) GetDeviceByName(name string) *Device {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -154,87 +139,32 @@ func (s *Service) GetDeviceByName(name string) *AirPlayDevice {
 	return nil
 }
 
-// GetChromecasts returns a copy of all discovered Chromecast devices.
-func (s *Service) GetChromecasts() []*ChromecastDevice {
+// GetDevicesByType returns all devices of a specific type.
+func (s *Service) GetDevicesByType(deviceType DeviceType) []*Device {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	devices := make([]*ChromecastDevice, 0, len(s.chromecasts))
-	for _, d := range s.chromecasts {
-		devices = append(devices, d)
+	var devices []*Device
+	for _, d := range s.devices {
+		if d.DeviceType == deviceType {
+			devices = append(devices, d)
+		}
 	}
 	return devices
 }
 
-// GetChromecast returns a Chromecast device by its ID.
-func (s *Service) GetChromecast(id string) *ChromecastDevice {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.chromecasts[id]
-}
-
-// GetChromecastByName returns a Chromecast device by its friendly name.
-func (s *Service) GetChromecastByName(name string) *ChromecastDevice {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, d := range s.chromecasts {
-		if strings.EqualFold(d.Name, name) {
-			return d
-		}
-	}
-	return nil
-}
-
-// GetAllDevices returns all discovered devices (AirPlay and Chromecast) as unified Device types.
+// GetAllDevices is an alias for GetDevices for interface compatibility.
 func (s *Service) GetAllDevices() []*Device {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	devices := make([]*Device, 0, len(s.devices)+len(s.chromecasts))
-	for _, d := range s.devices {
-		devices = append(devices, d.ToDevice())
-	}
-	for _, d := range s.chromecasts {
-		devices = append(devices, d.ToDevice())
-	}
-	return devices
+	return s.GetDevices()
 }
 
-// GetDeviceUnified returns a device by its ID, checking both AirPlay and Chromecast.
+// GetDeviceUnified is an alias for GetDevice for interface compatibility.
 func (s *Service) GetDeviceUnified(id string) *Device {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if d, ok := s.devices[id]; ok {
-		return d.ToDevice()
-	}
-	if d, ok := s.chromecasts[id]; ok {
-		return d.ToDevice()
-	}
-	return nil
+	return s.GetDevice(id)
 }
 
-// GetDeviceByNameUnified returns a device by its friendly name, checking both types.
-func (s *Service) GetDeviceByNameUnified(name string) *Device {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, d := range s.devices {
-		if strings.EqualFold(d.Name, name) {
-			return d.ToDevice()
-		}
-	}
-	for _, d := range s.chromecasts {
-		if strings.EqualFold(d.Name, name) {
-			return d.ToDevice()
-		}
-	}
-	return nil
-}
-
-// parseRAOPEntry parses a zeroconf entry into an AirPlayDevice.
-func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *AirPlayDevice {
+// parseRAOPEntry parses a zeroconf entry into a Device.
+func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *Device {
 	// RAOP instance names are formatted as "DEVICEID@FriendlyName"
 	// e.g., "C6F4891B35E7@Dining Room"
 	parts := strings.SplitN(entry.Instance, "@", 2)
@@ -285,21 +215,17 @@ func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *AirPlayDevice {
 		host = entry.AddrIPv6[0].String()
 	}
 
-	return &AirPlayDevice{
-		Name:      friendlyName,
-		DeviceID:  deviceID,
-		Host:      host,
-		Port:      entry.Port,
-		Model:     model,
-		Features:  features,
-		TXTRecord: txtRecord,
-		LastSeen:  time.Now(),
+	return &Device{
+		DeviceID:   deviceID,
+		DeviceType: DeviceTypeAirPlay,
+		Name:       friendlyName,
+		Host:       host,
+		Port:       entry.Port,
+		Model:      model,
+		Features:   features,
+		TXTRecord:  txtRecord,
+		LastSeen:   time.Now(),
 	}
-}
-
-// String returns a human-readable representation of the device.
-func (d *AirPlayDevice) String() string {
-	return fmt.Sprintf("%s (%s) at %s:%d [%s]", d.Name, d.DeviceID, d.Host, d.Port, d.Model)
 }
 
 // cleanMDNSName removes backslash escapes from mDNS names.
@@ -308,38 +234,6 @@ func cleanMDNSName(name string) string {
 	result := strings.ReplaceAll(name, "\\ ", " ")
 	result = strings.ReplaceAll(result, "\\", "")
 	return result
-}
-
-// EncryptionTypes returns the encryption types supported by the device.
-func (d *AirPlayDevice) EncryptionTypes() string {
-	if et, ok := d.TXTRecord["et"]; ok {
-		return et
-	}
-	return "0"
-}
-
-// SupportsALAC returns true if the device supports ALAC audio.
-func (d *AirPlayDevice) SupportsALAC() bool {
-	if cn, ok := d.TXTRecord["cn"]; ok {
-		return strings.Contains(cn, "1")
-	}
-	return false
-}
-
-// ChromecastDevice represents a discovered Chromecast device.
-type ChromecastDevice struct {
-	Name      string            // Friendly name (e.g., "Living Room TV")
-	DeviceID  string            // Unique device ID
-	Host      string            // Hostname or IP
-	Port      int               // Cast port (usually 8009)
-	Model     string            // Device model (e.g., "Chromecast")
-	TXTRecord map[string]string // Raw TXT record fields
-	LastSeen  time.Time         // When the device was last discovered
-}
-
-// String returns a human-readable representation of the Chromecast device.
-func (d *ChromecastDevice) String() string {
-	return fmt.Sprintf("%s (%s) at %s:%d [%s]", d.Name, d.DeviceID, d.Host, d.Port, d.Model)
 }
 
 // browseChromecastLoop continuously discovers Chromecast devices.
@@ -366,7 +260,7 @@ func (s *Service) browseChromecastLoop() {
 				device := s.parseChromecastEntry(entry)
 				if device != nil {
 					s.mu.Lock()
-					s.chromecasts[device.DeviceID] = device
+					s.devices[device.DeviceID] = device
 					s.mu.Unlock()
 					log.Printf("Discovered Chromecast: %s", device)
 				}
@@ -392,8 +286,8 @@ func (s *Service) browseChromecastLoop() {
 	}
 }
 
-// parseChromecastEntry parses a zeroconf entry into a ChromecastDevice.
-func (s *Service) parseChromecastEntry(entry *zeroconf.ServiceEntry) *ChromecastDevice {
+// parseChromecastEntry parses a zeroconf entry into a Device.
+func (s *Service) parseChromecastEntry(entry *zeroconf.ServiceEntry) *Device {
 	// Parse TXT record
 	txtRecord := make(map[string]string)
 	for _, txt := range entry.Text {
@@ -430,13 +324,15 @@ func (s *Service) parseChromecastEntry(entry *zeroconf.ServiceEntry) *Chromecast
 		host = entry.AddrIPv6[0].String()
 	}
 
-	return &ChromecastDevice{
-		Name:      friendlyName,
-		DeviceID:  deviceID,
-		Host:      host,
-		Port:      entry.Port,
-		Model:     model,
-		TXTRecord: txtRecord,
-		LastSeen:  time.Now(),
+	return &Device{
+		DeviceID:   deviceID,
+		DeviceType: DeviceTypeChromecast,
+		Name:       friendlyName,
+		Host:       host,
+		Port:       entry.Port,
+		Model:      model,
+		Features:   0,
+		TXTRecord:  txtRecord,
+		LastSeen:   time.Now(),
 	}
 }

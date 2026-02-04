@@ -18,7 +18,7 @@ import (
 type RAOPPlayer struct {
 	mu sync.Mutex
 
-	device   *discovery.AirPlayDevice
+	device   *discovery.Device
 	streamer *raop.Streamer
 	ffmpeg   *exec.Cmd
 	cancel   context.CancelFunc
@@ -29,7 +29,7 @@ type RAOPPlayer struct {
 }
 
 // NewRAOPPlayer creates a new RAOP player for the given AirPlay device.
-func NewRAOPPlayer(device *discovery.AirPlayDevice) *RAOPPlayer {
+func NewRAOPPlayer(device *discovery.Device) *RAOPPlayer {
 	return &RAOPPlayer{
 		device: device,
 		volume: 80,

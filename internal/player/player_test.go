@@ -8,12 +8,13 @@ import (
 )
 
 func TestNewRAOPPlayer(t *testing.T) {
-	device := &discovery.AirPlayDevice{
-		Name:     "Living Room",
-		DeviceID: "AABBCCDD1234",
-		Host:     "192.168.1.100",
-		Port:     7000,
-		Model:    "Shairport Sync",
+	device := &discovery.Device{
+		Name:       "Living Room",
+		DeviceID:   "AABBCCDD1234",
+		DeviceType: discovery.DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
+		Model:      "Shairport Sync",
 	}
 
 	player := NewRAOPPlayer(device)
@@ -30,9 +31,10 @@ func TestNewRAOPPlayer(t *testing.T) {
 }
 
 func TestRAOPPlayer_SetVolume(t *testing.T) {
-	device := &discovery.AirPlayDevice{
-		Host: "192.168.1.100",
-		Port: 7000,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
 	}
 
 	player := NewRAOPPlayer(device)
@@ -66,9 +68,10 @@ func TestNullPlayer(t *testing.T) {
 }
 
 func TestRAOPPlayer_Stop_NoActiveStream(t *testing.T) {
-	device := &discovery.AirPlayDevice{
-		Host: "192.168.1.100",
-		Port: 7000,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
 	}
 
 	player := NewRAOPPlayer(device)
@@ -81,9 +84,10 @@ func TestRAOPPlayer_Stop_NoActiveStream(t *testing.T) {
 }
 
 func TestRAOPPlayer_Pause_NoActiveStream(t *testing.T) {
-	device := &discovery.AirPlayDevice{
-		Host: "192.168.1.100",
-		Port: 7000,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
 	}
 
 	player := NewRAOPPlayer(device)
@@ -98,12 +102,13 @@ func TestRAOPPlayer_Pause_NoActiveStream(t *testing.T) {
 // Chromecast player tests
 
 func TestNewChromecastPlayer(t *testing.T) {
-	device := &discovery.ChromecastDevice{
-		Name:     "Living Room TV",
-		DeviceID: "abc123",
-		Host:     "192.168.1.101",
-		Port:     8009,
-		Model:    "Chromecast",
+	device := &discovery.Device{
+		Name:       "Living Room TV",
+		DeviceID:   "abc123",
+		DeviceType: discovery.DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
+		Model:      "Chromecast",
 	}
 
 	player := NewChromecastPlayer(device)
@@ -120,9 +125,10 @@ func TestNewChromecastPlayer(t *testing.T) {
 }
 
 func TestChromecastPlayer_SetVolume_NoConnection(t *testing.T) {
-	device := &discovery.ChromecastDevice{
-		Host: "192.168.1.101",
-		Port: 8009,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
 	}
 
 	player := NewChromecastPlayer(device)
@@ -138,9 +144,10 @@ func TestChromecastPlayer_SetVolume_NoConnection(t *testing.T) {
 }
 
 func TestChromecastPlayer_Stop_NoActiveStream(t *testing.T) {
-	device := &discovery.ChromecastDevice{
-		Host: "192.168.1.101",
-		Port: 8009,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
 	}
 
 	player := NewChromecastPlayer(device)
@@ -153,9 +160,10 @@ func TestChromecastPlayer_Stop_NoActiveStream(t *testing.T) {
 }
 
 func TestChromecastPlayer_Pause_NoActiveStream(t *testing.T) {
-	device := &discovery.ChromecastDevice{
-		Host: "192.168.1.101",
-		Port: 8009,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
 	}
 
 	player := NewChromecastPlayer(device)
@@ -168,9 +176,10 @@ func TestChromecastPlayer_Pause_NoActiveStream(t *testing.T) {
 }
 
 func TestChromecastPlayer_Unpause_NoActiveStream(t *testing.T) {
-	device := &discovery.ChromecastDevice{
-		Host: "192.168.1.101",
-		Port: 8009,
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeChromecast,
+		Host:       "192.168.1.101",
+		Port:       8009,
 	}
 
 	player := NewChromecastPlayer(device)

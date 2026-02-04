@@ -241,7 +241,7 @@ func runDLNAServer(ctx context.Context, targetDevice string, httpPort int) {
 	time.Sleep(5 * time.Second)
 
 	// Find the target device
-	var device *discovery.AirPlayDevice
+	var device *discovery.Device
 	if targetDevice != "" {
 		device = disco.GetDeviceByName(targetDevice)
 		if device == nil {

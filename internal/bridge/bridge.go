@@ -28,11 +28,10 @@ const (
 type RendererInstance struct {
 	ID           string
 	Name         string
-	DeviceType   string                      // "airplay" or "chromecast"
-	AirPlayName  string                      // Legacy: for AirPlay devices
-	DeviceName   string                      // Generic device name
-	Device       *discovery.AirPlayDevice    // AirPlay device (nil for Chromecast)
-	Chromecast   *discovery.ChromecastDevice // Chromecast device (nil for AirPlay)
+	DeviceType   string              // "airplay" or "chromecast"
+	AirPlayName  string              // Legacy: for AirPlay devices
+	DeviceName   string              // Generic device name
+	Device       *discovery.Device   // Target device
 	State        *state.PlayerState
 	Player       upnp.Player // Generic player interface
 	EventManager *upnp.EventManager
@@ -184,34 +183,26 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 		deviceType = "airplay" // Default to AirPlay for legacy renderers
 	}
 
+	// Find the device (unified lookup)
+	deviceID := r.DeviceID
+	if deviceID == "" {
+		deviceID = r.AirPlayDeviceID // Fallback for legacy
+	}
+	device := b.disco.GetDevice(deviceID)
+	if device == nil {
+		cancel()
+		return fmt.Errorf("device not found: %s", deviceID)
+	}
+
+	inst.Device = device
+	inst.DeviceName = device.Name
+	inst.AirPlayName = device.Name
+
 	switch deviceType {
 	case "chromecast":
-		// Find the Chromecast device
-		device := b.disco.GetChromecast(r.DeviceID)
-		if device == nil {
-			cancel()
-			return fmt.Errorf("Chromecast device not found: %s", r.DeviceID)
-		}
-		inst.Chromecast = device
-		inst.DeviceName = device.Name
 		inst.Player = player.NewChromecastPlayer(device)
 		log.Printf("Added Chromecast renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
-
 	default: // "airplay"
-		// Find the AirPlay device
-		device := b.disco.GetDevice(r.AirPlayDeviceID)
-		if device == nil {
-			// Try using DeviceID if AirPlayDeviceID is empty
-			if r.DeviceID != "" {
-				device = b.disco.GetDevice(r.DeviceID)
-			}
-		}
-		if device == nil {
-			cancel()
-			return fmt.Errorf("AirPlay device not found: %s", r.AirPlayDeviceID)
-		}
-		inst.Device = device
-		inst.AirPlayName = device.Name
 		inst.Player = player.NewRAOPPlayer(device)
 		log.Printf("Added AirPlay renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
 	}

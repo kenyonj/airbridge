@@ -47,50 +47,14 @@ func (d *Device) SupportsALAC() bool {
 	return false
 }
 
-// ToAirPlayDevice converts to legacy AirPlayDevice for backward compatibility.
-// Deprecated: Use Device directly instead.
-func (d *Device) ToAirPlayDevice() *AirPlayDevice {
+// EncryptionTypes returns the encryption types supported by the device.
+// Only applicable to AirPlay devices.
+func (d *Device) EncryptionTypes() string {
 	if d.DeviceType != DeviceTypeAirPlay {
-		return nil
+		return "0"
 	}
-	return &AirPlayDevice{
-		Name:      d.Name,
-		DeviceID:  d.DeviceID,
-		Host:      d.Host,
-		Port:      d.Port,
-		Model:     d.Model,
-		Features:  d.Features,
-		TXTRecord: d.TXTRecord,
-		LastSeen:  d.LastSeen,
+	if et, ok := d.TXTRecord["et"]; ok {
+		return et
 	}
-}
-
-// ToDevice converts an AirPlayDevice to the unified Device type.
-func (a *AirPlayDevice) ToDevice() *Device {
-	return &Device{
-		DeviceID:   a.DeviceID,
-		DeviceType: DeviceTypeAirPlay,
-		Name:       a.Name,
-		Host:       a.Host,
-		Port:       a.Port,
-		Model:      a.Model,
-		Features:   a.Features,
-		TXTRecord:  a.TXTRecord,
-		LastSeen:   a.LastSeen,
-	}
-}
-
-// ToDevice converts a ChromecastDevice to the unified Device type.
-func (c *ChromecastDevice) ToDevice() *Device {
-	return &Device{
-		DeviceID:   c.DeviceID,
-		DeviceType: DeviceTypeChromecast,
-		Name:       c.Name,
-		Host:       c.Host,
-		Port:       c.Port,
-		Model:      c.Model,
-		Features:   0,
-		TXTRecord:  c.TXTRecord,
-		LastSeen:   c.LastSeen,
-	}
+	return "0"
 }

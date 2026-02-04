@@ -74,28 +74,22 @@ func NewDemoDiscovery() *DemoDiscovery {
 	return &DemoDiscovery{}
 }
 
-// GetDevices returns mock AirPlay devices.
-func (d *DemoDiscovery) GetDevices() []*discovery.AirPlayDevice {
-	return []*discovery.AirPlayDevice{
-		{DeviceID: "airplay-1", Name: "Living Room HomePod", Host: "192.168.1.50", Port: 7000, Model: "AudioAccessory1,1"},
-		{DeviceID: "airplay-2", Name: "Bedroom HomePod Mini", Host: "192.168.1.51", Port: 7000, Model: "AudioAccessory5,1"},
-		{DeviceID: "airplay-3", Name: "Office Speaker", Host: "192.168.1.52", Port: 7000, Model: "AirPort Express"},
-		{DeviceID: "airplay-4", Name: "Kitchen HomePod", Host: "192.168.1.53", Port: 7000, Model: "AudioAccessory1,1"},
-		{DeviceID: "airplay-5", Name: "Patio Speaker", Host: "192.168.1.54", Port: 7000, Model: "AudioAccessory5,1"},
+// GetDevices returns all mock devices.
+func (d *DemoDiscovery) GetDevices() []*discovery.Device {
+	return []*discovery.Device{
+		{DeviceID: "airplay-1", DeviceType: discovery.DeviceTypeAirPlay, Name: "Living Room HomePod", Host: "192.168.1.50", Port: 7000, Model: "AudioAccessory1,1"},
+		{DeviceID: "airplay-2", DeviceType: discovery.DeviceTypeAirPlay, Name: "Bedroom HomePod Mini", Host: "192.168.1.51", Port: 7000, Model: "AudioAccessory5,1"},
+		{DeviceID: "airplay-3", DeviceType: discovery.DeviceTypeAirPlay, Name: "Office Speaker", Host: "192.168.1.52", Port: 7000, Model: "AirPort Express"},
+		{DeviceID: "airplay-4", DeviceType: discovery.DeviceTypeAirPlay, Name: "Kitchen HomePod", Host: "192.168.1.53", Port: 7000, Model: "AudioAccessory1,1"},
+		{DeviceID: "airplay-5", DeviceType: discovery.DeviceTypeAirPlay, Name: "Patio Speaker", Host: "192.168.1.54", Port: 7000, Model: "AudioAccessory5,1"},
+		{DeviceID: "chromecast-1", DeviceType: discovery.DeviceTypeChromecast, Name: "Living Room TV", Host: "192.168.1.60", Port: 8009, Model: "Chromecast Ultra"},
+		{DeviceID: "chromecast-2", DeviceType: discovery.DeviceTypeChromecast, Name: "Bedroom Display", Host: "192.168.1.61", Port: 8009, Model: "Nest Hub"},
+		{DeviceID: "chromecast-3", DeviceType: discovery.DeviceTypeChromecast, Name: "Kitchen Display", Host: "192.168.1.62", Port: 8009, Model: "Nest Hub Max"},
 	}
 }
 
-// GetChromecasts returns mock Chromecast devices.
-func (d *DemoDiscovery) GetChromecasts() []*discovery.ChromecastDevice {
-	return []*discovery.ChromecastDevice{
-		{DeviceID: "chromecast-1", Name: "Living Room TV", Host: "192.168.1.60", Port: 8009, Model: "Chromecast Ultra"},
-		{DeviceID: "chromecast-2", Name: "Bedroom Display", Host: "192.168.1.61", Port: 8009, Model: "Nest Hub"},
-		{DeviceID: "chromecast-3", Name: "Kitchen Display", Host: "192.168.1.62", Port: 8009, Model: "Nest Hub Max"},
-	}
-}
-
-// GetDevice returns a mock AirPlay device by ID.
-func (d *DemoDiscovery) GetDevice(deviceID string) *discovery.AirPlayDevice {
+// GetDevice returns a mock device by ID.
+func (d *DemoDiscovery) GetDevice(deviceID string) *discovery.Device {
 	for _, dev := range d.GetDevices() {
 		if dev.DeviceID == deviceID {
 			return dev
@@ -104,37 +98,14 @@ func (d *DemoDiscovery) GetDevice(deviceID string) *discovery.AirPlayDevice {
 	return nil
 }
 
-// GetChromecast returns a mock Chromecast device by ID.
-func (d *DemoDiscovery) GetChromecast(deviceID string) *discovery.ChromecastDevice {
-	for _, dev := range d.GetChromecasts() {
-		if dev.DeviceID == deviceID {
-			return dev
-		}
-	}
-	return nil
-}
-
-// GetAllDevices returns all mock devices as unified Device types.
+// GetAllDevices returns all mock devices (alias for GetDevices).
 func (d *DemoDiscovery) GetAllDevices() []*discovery.Device {
-	var devices []*discovery.Device
-	for _, dev := range d.GetDevices() {
-		devices = append(devices, dev.ToDevice())
-	}
-	for _, dev := range d.GetChromecasts() {
-		devices = append(devices, dev.ToDevice())
-	}
-	return devices
+	return d.GetDevices()
 }
 
-// GetDeviceUnified returns a mock device by ID.
+// GetDeviceUnified returns a mock device by ID (alias for GetDevice).
 func (d *DemoDiscovery) GetDeviceUnified(deviceID string) *discovery.Device {
-	if dev := d.GetDevice(deviceID); dev != nil {
-		return dev.ToDevice()
-	}
-	if dev := d.GetChromecast(deviceID); dev != nil {
-		return dev.ToDevice()
-	}
-	return nil
+	return d.GetDevice(deviceID)
 }
 
 // DemoDB provides mock database operations.

@@ -46,11 +46,8 @@ type DBInterface interface {
 
 // DiscoveryInterface defines the discovery operations needed by the web server.
 type DiscoveryInterface interface {
-	GetDevices() []*discovery.AirPlayDevice
-	GetChromecasts() []*discovery.ChromecastDevice
-	GetDevice(deviceID string) *discovery.AirPlayDevice
-	GetChromecast(deviceID string) *discovery.ChromecastDevice
-	// Unified device methods
+	GetDevices() []*discovery.Device
+	GetDevice(deviceID string) *discovery.Device
 	GetAllDevices() []*discovery.Device
 	GetDeviceUnified(deviceID string) *discovery.Device
 }
@@ -300,8 +297,7 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) newRendererForm(w http.ResponseWriter, r *http.Request) {
 	// Get all available devices for the dropdown
-	airplayDevices := s.disco.GetDevices()
-	chromecastDevices := s.disco.GetChromecasts()
+	allDevices := s.disco.GetDevices()
 	renderers, _ := s.db.ListRenderers()
 
 	// Build a set of configured device IDs
@@ -315,26 +311,13 @@ func (s *Server) newRendererForm(w http.ResponseWriter, r *http.Request) {
 
 	// Convert to DeviceInfo, excluding already configured devices
 	var deviceInfos []DeviceInfo
-	for _, d := range airplayDevices {
+	for _, d := range allDevices {
 		if configuredIDs[d.DeviceID] {
 			continue
 		}
 		deviceInfos = append(deviceInfos, DeviceInfo{
 			DeviceID:   d.DeviceID,
-			DeviceType: "airplay",
-			Name:       d.Name,
-			Host:       d.Host,
-			Port:       d.Port,
-			Model:      d.Model,
-		})
-	}
-	for _, d := range chromecastDevices {
-		if configuredIDs[d.DeviceID] {
-			continue
-		}
-		deviceInfos = append(deviceInfos, DeviceInfo{
-			DeviceID:   d.DeviceID,
-			DeviceType: "chromecast",
+			DeviceType: string(d.DeviceType),
 			Name:       d.Name,
 			Host:       d.Host,
 			Port:       d.Port,
@@ -387,22 +370,12 @@ func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 		// New form provides target_name
 		deviceName = targetName
 	} else {
-		// Legacy form - look up device name
-		switch deviceType {
-		case "chromecast":
-			device := s.disco.GetChromecast(deviceID)
-			if device != nil {
-				deviceName = device.Name
-			} else {
-				deviceName = name
-			}
-		default: // "airplay"
-			device := s.disco.GetDevice(deviceID)
-			if device != nil {
-				deviceName = device.Name
-			} else {
-				deviceName = name
-			}
+		// Look up device name from unified discovery
+		device := s.disco.GetDevice(deviceID)
+		if device != nil {
+			deviceName = device.Name
+		} else {
+			deviceName = name
 		}
 	}
 

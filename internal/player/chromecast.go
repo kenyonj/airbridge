@@ -17,7 +17,7 @@ import (
 type ChromecastPlayer struct {
 	mu sync.Mutex
 
-	device *discovery.ChromecastDevice
+	device *discovery.Device
 	app    *application.Application
 
 	// Current state
@@ -26,7 +26,7 @@ type ChromecastPlayer struct {
 }
 
 // NewChromecastPlayer creates a new Chromecast player for the given device.
-func NewChromecastPlayer(device *discovery.ChromecastDevice) *ChromecastPlayer {
+func NewChromecastPlayer(device *discovery.Device) *ChromecastPlayer {
 	return &ChromecastPlayer{
 		device: device,
 		volume: 80,

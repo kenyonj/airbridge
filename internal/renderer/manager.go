@@ -30,7 +30,7 @@ func generateDeterministicUUID(deviceID string) string {
 
 // Instance represents a single DLNA renderer instance.
 type Instance struct {
-	Device       *discovery.AirPlayDevice
+	Device       *discovery.Device
 	UUID         string
 	FriendlyName string
 	Port         int
@@ -88,8 +88,8 @@ func (m *Manager) Stop() {
 	}
 }
 
-// AddDevice creates a renderer for an AirPlay device.
-func (m *Manager) AddDevice(device *discovery.AirPlayDevice) error {
+// AddDevice creates a renderer for a device.
+func (m *Manager) AddDevice(device *discovery.Device) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -231,7 +231,7 @@ func (m *Manager) findAvailablePort() int {
 }
 
 // UpdateDevices synchronizes renderer instances with discovered devices.
-func (m *Manager) UpdateDevices(devices []*discovery.AirPlayDevice) {
+func (m *Manager) UpdateDevices(devices []*discovery.Device) {
 	// Add new devices
 	for _, device := range devices {
 		_ = m.AddDevice(device)
