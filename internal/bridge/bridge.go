@@ -28,10 +28,10 @@ const (
 type RendererInstance struct {
 	ID           string
 	Name         string
-	DeviceType   string              // "airplay" or "chromecast"
-	AirPlayName  string              // Legacy: for AirPlay devices
-	DeviceName   string              // Generic device name
-	Device       *discovery.Device   // Target device
+	DeviceType   string            // "airplay" or "chromecast"
+	AirPlayName  string            // Legacy: for AirPlay devices
+	DeviceName   string            // Generic device name
+	Device       *discovery.Device // Target device
 	State        *state.PlayerState
 	Player       upnp.Player // Generic player interface
 	EventManager *upnp.EventManager
