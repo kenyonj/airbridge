@@ -144,18 +144,19 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Build renderer views with running status and DLNA URLs
 	localIP := s.renderers.LocalIP()
 	var views []RendererView
+	playingCount := 0
 	for _, r := range renderers {
+		transportState := s.renderers.GetTransportState(r.ID)
+		if transportState == "PLAYING" {
+			playingCount++
+		}
 		views = append(views, RendererView{
 			Renderer:       r,
 			Running:        s.renderers.IsRunning(r.ID),
 			DLNAURL:        fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
-			TransportState: s.renderers.GetTransportState(r.ID),
+			TransportState: transportState,
 		})
 	}
-
-	// Format uptime
-	uptime := s.renderers.Uptime()
-	uptimeStr := formatDuration(uptime)
 
 	data := map[string]interface{}{
 		"Title":        "Dashboard",
@@ -164,8 +165,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"Renderers":    views,
 		"RunningCount": s.renderers.RunningCount(),
 		"TotalCount":   len(renderers),
-		"Uptime":       uptimeStr,
-		"LocalIP":      localIP,
+		"PlayingCount": playingCount,
 		"DeviceCount":  len(s.disco.GetDevices()) + len(s.disco.GetChromecasts()),
 	}
 
@@ -578,13 +578,19 @@ func (s *Server) renameRenderer(w http.ResponseWriter, r *http.Request, id strin
 
 func (s *Server) handleServerStatus(w http.ResponseWriter, r *http.Request) {
 	renderers, _ := s.db.ListRenderers()
-	uptime := s.renderers.Uptime()
+
+	// Count playing renderers
+	playingCount := 0
+	for _, rend := range renderers {
+		if s.renderers.GetTransportState(rend.ID) == "PLAYING" {
+			playingCount++
+		}
+	}
 
 	data := map[string]interface{}{
 		"RunningCount": s.renderers.RunningCount(),
 		"TotalCount":   len(renderers),
-		"Uptime":       formatDuration(uptime),
-		"LocalIP":      s.renderers.LocalIP(),
+		"PlayingCount": playingCount,
 		"DeviceCount":  len(s.disco.GetDevices()) + len(s.disco.GetChromecasts()),
 	}
 
