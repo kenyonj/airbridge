@@ -18,19 +18,18 @@
     
     Perfect for streaming from Music Assistant, Plex, Roon, or any DLNA-compatible media server to:
     • AirPlay devices (HomePods, Sonos, Apple TV, Juke Audio)
-    • Chromecast devices (Google Nest, Chromecast Audio)
+    • Chromecast devices (Google Nest Hub, Chromecast Audio)
     
     Features:
-    • Web-based admin interface with real-time status
-    • Auto-discovery of AirPlay and Chromecast devices
-    • Create and manage multiple bridges
-    • Live playback status via WebSocket
+    • Web admin UI with real-time playback status via WebSocket
+    • Automatic discovery of AirPlay (_raop._tcp) and Chromecast (_googlecast._tcp) devices
+    • Create and manage multiple DLNA-to-AirPlay/Chromecast bridges
     • Volume control support
-    • Persistent configuration
+    • Persistent SQLite database for configuration
     
-    IMPORTANT: Set AIRBRIDGE_PORT if you need a port other than 8200.
+    ⚠️ PORT CONFIGURATION: The web admin runs on port 8200 by default. To use a different port, you MUST set the AIRBRIDGE_PORT variable below. The WebUI link will update automatically.
     
-    Requires host network mode for mDNS device discovery.
+    Requires host network mode for mDNS device discovery and SSDP announcements.
   </Overview>
   <Category>MediaServer:Music</Category>
   <WebUI>http://[IP]:[PORT:AIRBRIDGE_PORT]/admin</WebUI>
