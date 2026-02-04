@@ -1,0 +1,44 @@
+{{define "content"}}
+<div class="space-y-8">
+    <!-- Server Info -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Server Information</h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <div>
+                <div class="text-sm text-gray-500">Uptime</div>
+                <div class="text-lg font-semibold text-gray-800">{{.Uptime}}</div>
+            </div>
+            <div>
+                <div class="text-sm text-gray-500">Version</div>
+                <div class="text-lg font-semibold text-gray-800">v{{.Version}}</div>
+            </div>
+            <div>
+                <div class="text-sm text-gray-500">Server IP</div>
+                <div class="text-lg font-mono text-gray-800">{{.LocalIP}}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="bg-white rounded-lg shadow p-6 border-2 border-red-200">
+        <h2 class="text-lg font-semibold text-red-600 mb-2">Danger Zone</h2>
+        <p class="text-sm text-gray-600 mb-6">These actions are destructive and cannot be undone.</p>
+        
+        <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+                <div>
+                    <div class="font-medium text-gray-800">Delete All Renderers</div>
+                    <div class="text-sm text-gray-500">Stop all running renderers and remove them from the database.</div>
+                </div>
+                <button 
+                    hx-post="/admin/settings/reset"
+                    hx-confirm="Are you sure you want to delete ALL renderers? This cannot be undone."
+                    hx-target="body"
+                    class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium">
+                    Delete All
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

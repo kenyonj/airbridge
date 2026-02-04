@@ -79,6 +79,7 @@ type RendererController interface {
 	LocalIP() string
 	StartRenderer(id string) error
 	StopRenderer(id string)
+	StopAll()
 	RestartAll()
 	GetTransportState(id string) string
 }
@@ -111,7 +112,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/renderers", s.handleRenderers)
 	mux.HandleFunc("/admin/renderers/", s.handleRendererAction)
 	mux.HandleFunc("/admin/server/status", s.handleServerStatus)
-	mux.HandleFunc("/admin/server/restart", s.handleServerRestart)
+	mux.HandleFunc("/admin/settings", s.handleSettings)
+	mux.HandleFunc("/admin/settings/reset", s.handleSettingsReset)
 	mux.HandleFunc("/admin/ws", s.hub.HandleWebSocket)
 }
 
@@ -597,17 +599,50 @@ func (s *Server) handleServerStatus(w http.ResponseWriter, r *http.Request) {
 	s.renderPartial(w, "server_status.html", data)
 }
 
-func (s *Server) handleServerRestart(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	uptime := s.renderers.Uptime()
+
+	data := map[string]interface{}{
+		"Title":   "Settings",
+		"Active":  "settings",
+		"Version": Version,
+		"Uptime":  formatDuration(uptime),
+		"LocalIP": s.renderers.LocalIP(),
+	}
+
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleSettingsReset(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	s.renderers.RestartAll()
-	log.Println("Server restart triggered from web UI")
+	// Stop all running renderers
+	s.renderers.StopAll()
 
-	// Return updated status
-	s.handleServerStatus(w, r)
+	// Delete all renderers from database
+	renderers, err := s.db.ListRenderers()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, rend := range renderers {
+		if err := s.db.DeleteRenderer(rend.ID); err != nil {
+			log.Printf("Error deleting renderer %s: %v", rend.ID, err)
+		}
+	}
+
+	log.Printf("Deleted all %d renderers from database", len(renderers))
+
+	// Broadcast change to all clients
+	s.BroadcastRendererChange("", "reset")
+
+	// Redirect to dashboard
+	w.Header().Set("HX-Redirect", "/admin")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data interface{}) {

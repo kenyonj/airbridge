@@ -48,6 +48,9 @@ func (d *DemoController) StartRenderer(id string) error {
 // StopRenderer is a no-op in demo mode.
 func (d *DemoController) StopRenderer(id string) {}
 
+// StopAll is a no-op in demo mode.
+func (d *DemoController) StopAll() {}
+
 // RestartAll is a no-op in demo mode.
 func (d *DemoController) RestartAll() {}
 

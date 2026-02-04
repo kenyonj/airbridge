@@ -333,6 +333,21 @@ func (b *Bridge) RestartAll() {
 	log.Println("All renderers restarted")
 }
 
+// StopAll stops all running renderers without reloading.
+func (b *Bridge) StopAll() {
+	log.Println("Stopping all renderers...")
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	for _, r := range b.renderers {
+		b.stopRenderer(r)
+	}
+	b.renderers = make(map[string]*RendererInstance)
+
+	log.Println("All renderers stopped")
+}
+
 // startHTTPServer starts the unified HTTP server.
 func (b *Bridge) startHTTPServer() error {
 	mux := http.NewServeMux()

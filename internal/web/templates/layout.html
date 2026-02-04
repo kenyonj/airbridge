@@ -31,7 +31,8 @@
                     <span class="text-indigo-200 text-sm">Anything → Everywhere</span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="/admin" class="hover:text-indigo-200">Dashboard</a>
+                    <a href="/admin" class="hover:text-indigo-200 {{if eq .Active "dashboard"}}font-semibold{{end}}">Dashboard</a>
+                    <a href="/admin/settings" class="hover:text-indigo-200 {{if eq .Active "settings"}}font-semibold{{end}}">Settings</a>
                 </div>
             </div>
         </div>
