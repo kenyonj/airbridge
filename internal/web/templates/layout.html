@@ -39,7 +39,7 @@
     </nav>
 
     <main class="max-w-7xl mx-auto px-4 py-8">
-        {{template "content" .}}
+        {{if eq .Active "settings"}}{{template "settings_content" .}}{{else}}{{template "dashboard_content" .}}{{end}}
     </main>
 
     <footer class="text-center text-gray-500 text-sm py-4">
