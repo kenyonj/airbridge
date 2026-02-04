@@ -137,6 +137,12 @@ func (s *Server) BroadcastRendererChange(rendererID, action string) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	// Only handle exact /admin or /admin/ paths
+	if r.URL.Path != "/admin" && r.URL.Path != "/admin/" {
+		http.NotFound(w, r)
+		return
+	}
+
 	renderers, err := s.db.ListRenderers()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
