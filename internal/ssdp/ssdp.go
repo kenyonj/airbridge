@@ -15,6 +15,13 @@ const (
 	announceFreq = 30 * time.Second
 )
 
+// bootID is set once at package init to track restarts.
+// UPnP spec says BOOTID should increment on each restart.
+var bootID = time.Now().Unix() % 2147483647
+
+// ConfigID can be incremented when device configuration changes.
+var ConfigID int64 = 1
+
 // UPnP service types
 const (
 	DeviceType      = "urn:schemas-upnp-org:device:MediaRenderer:1"
@@ -64,9 +71,9 @@ func AnnounceWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID
 					"NTS: ssdp:alive\r\n"+
 					"SERVER: %s\r\n"+
 					"USN: %s\r\n"+
-					"BOOTID.UPNP.ORG: 1\r\n"+
-					"CONFIGID.UPNP.ORG: 1\r\n\r\n",
-				ssdpAddr, cacheMaxAge, location, t.st, serverName, t.usn)
+					"BOOTID.UPNP.ORG: %d\r\n"+
+					"CONFIGID.UPNP.ORG: %d\r\n\r\n",
+				ssdpAddr, cacheMaxAge, location, t.st, serverName, t.usn, bootID, ConfigID)
 			_, _ = conn.Write([]byte(msg))
 		}
 	}
@@ -171,9 +178,9 @@ func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, dev
 				"SERVER: %s\r\n"+
 				"ST: %s\r\n"+
 				"USN: %s\r\n"+
-				"BOOTID.UPNP.ORG: 1\r\n"+
-				"CONFIGID.UPNP.ORG: 1\r\n\r\n",
-			cacheMaxAge, time.Now().UTC().Format(time.RFC1123), location, serverName, st, usn)
+				"BOOTID.UPNP.ORG: %d\r\n"+
+				"CONFIGID.UPNP.ORG: %d\r\n\r\n",
+			cacheMaxAge, time.Now().UTC().Format(time.RFC1123), location, serverName, st, usn, bootID, ConfigID)
 		_, _ = conn.WriteToUDP([]byte(resp), src)
 	}
 }

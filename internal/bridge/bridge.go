@@ -433,14 +433,17 @@ func (b *Bridge) startHTTPServer() error {
 	// Service descriptions (shared)
 	mux.HandleFunc("/upnp/service/avtransport.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		w.Header().Set("Cache-Control", "max-age=1800")
 		_, _ = w.Write([]byte(upnp.SCPDAVTransportXML()))
 	})
 	mux.HandleFunc("/upnp/service/renderingcontrol.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		w.Header().Set("Cache-Control", "max-age=1800")
 		_, _ = w.Write([]byte(upnp.SCPDRenderingControlXML()))
 	})
 	mux.HandleFunc("/upnp/service/connectionmanager.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		w.Header().Set("Cache-Control", "max-age=1800")
 		_, _ = w.Write([]byte(upnp.SCPDConnectionManagerXML()))
 	})
 
@@ -468,6 +471,7 @@ func (b *Bridge) handleDeviceDescription(w http.ResponseWriter, r *http.Request)
 	xml := b.generateDeviceXML(baseURL)
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "max-age=1800")
 	_, _ = w.Write([]byte(xml))
 }
 
@@ -624,6 +628,7 @@ func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request,
 		renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID)
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "max-age=1800")
 	_, _ = w.Write([]byte(xml))
 }
 
