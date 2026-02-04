@@ -19,12 +19,14 @@ RUN cmake .. && make
 # Build airbridge
 FROM golang:1.24-bookworm AS go-builder
 
+ARG VERSION=dev
+
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /airbridge ./cmd/airbridge
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X github.com/kenyonj/airbridge/internal/web.Version=${VERSION}" -o /airbridge ./cmd/airbridge
 
 # Final image
 FROM debian:bookworm-slim

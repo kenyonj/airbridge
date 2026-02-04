@@ -44,15 +44,17 @@ lint:
 
 # Docker
 DOCKER_IMAGE=ghcr.io/kenyonj/airbridge
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 docker-build:
-	docker build -t $(DOCKER_IMAGE):latest .
+	docker build --build-arg VERSION=$(VERSION) -t $(DOCKER_IMAGE):latest -t $(DOCKER_IMAGE):$(VERSION) .
 
 docker-run:
 	docker run --rm --network=host -v airbridge-data:/data $(DOCKER_IMAGE):latest
 
 docker-push:
 	docker push $(DOCKER_IMAGE):latest
+	docker push $(DOCKER_IMAGE):$(VERSION)
 
 # Install dependencies for CGO (libraop)
 setup-libraop:

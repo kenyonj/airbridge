@@ -71,7 +71,7 @@ func main() {
 	fmt.Println()
 
 	if *version {
-		fmt.Println("Version: 0.0.4")
+		fmt.Printf("Version: %s\n", web.Version)
 		return
 	}
 
