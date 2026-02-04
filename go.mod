@@ -23,6 +23,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jroimartin/gocui v0.5.0 // indirect

@@ -17,13 +17,16 @@ const (
 	StateNoMedia    TransportState = "NO_MEDIA_PRESENT"
 )
 
+// StateChangeCallback is called when transport state changes.
+type StateChangeCallback func(state TransportState)
+
 // PlayerState holds the current state of the DLNA renderer.
 type PlayerState struct {
 	mu sync.RWMutex
 
-	ctx       context.Context
-	cancel    context.CancelFunc
-	
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	// Session management
 	sessionOwner string
 
@@ -35,6 +38,9 @@ type PlayerState struct {
 	// Volume state
 	volume int
 	muted  bool
+
+	// Callback for state changes
+	onStateChange StateChangeCallback
 }
 
 // New creates a new PlayerState.
@@ -46,6 +52,13 @@ func New(ctx context.Context) *PlayerState {
 		transportState: StateNoMedia,
 		volume:         80,
 	}
+}
+
+// SetOnStateChange sets the callback for state changes.
+func (s *PlayerState) SetOnStateChange(cb StateChangeCallback) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onStateChange = cb
 }
 
 // Context returns the state's context.
@@ -107,8 +120,14 @@ func (s *PlayerState) GetURI() (string, string) {
 // SetTransportState sets the transport state.
 func (s *PlayerState) SetTransportState(state TransportState) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.transportState = state
+	cb := s.onStateChange
+	s.mu.Unlock()
+
+	// Call callback outside of lock to avoid deadlock
+	if cb != nil {
+		cb(state)
+	}
 }
 
 // GetTransportState returns the current transport state.

@@ -25,7 +25,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     <h1 class="text-xl font-bold">🌉 Airbridge</h1>
-                    <span class="text-indigo-200 text-sm">DLNA → AirPlay/Chromecast Bridge</span>
+                    <span class="text-indigo-200 text-sm">Anything → Everywhere</span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <a href="/admin" class="hover:text-indigo-200">Dashboard</a>
@@ -87,6 +87,55 @@
                 copyText.textContent = 'Copy URL';
             }, 2000);
         }
+
+        // WebSocket for live state updates
+        (function() {
+            var ws;
+            var reconnectInterval = 1000;
+            var maxReconnect = 30000;
+
+            function connect() {
+                var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(protocol + '//' + window.location.host + '/admin/ws');
+
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    reconnectInterval = 1000;
+                };
+
+                ws.onmessage = function(event) {
+                    var data = JSON.parse(event.data);
+                    if (data.type === 'state_update') {
+                        updateRendererState(data.renderer_id, data.transport_state, data.running);
+                    }
+                };
+
+                ws.onclose = function() {
+                    console.log('WebSocket disconnected, reconnecting in ' + reconnectInterval + 'ms');
+                    setTimeout(connect, reconnectInterval);
+                    reconnectInterval = Math.min(reconnectInterval * 2, maxReconnect);
+                };
+
+                ws.onerror = function(err) {
+                    console.error('WebSocket error:', err);
+                    ws.close();
+                };
+            }
+
+            function updateRendererState(rendererId, transportState, running) {
+                // Find renderer elements and update their state indicators
+                var rendererList = document.getElementById('renderer-list');
+                if (!rendererList) return;
+
+                // Trigger HTMX refresh to get updated state
+                htmx.trigger(rendererList, 'refresh');
+            }
+
+            // Start connection when page loads
+            if (window.location.pathname.startsWith('/admin')) {
+                connect();
+            }
+        })();
     </script>
 </body>
 </html>

@@ -1,8 +1,10 @@
 # Airbridge
 
-> Bridge DLNA/UPnP audio streams to AirPlay and Chromecast devices
+> Anything → Everywhere: Bridge DLNA audio streams to AirPlay & Chromecast
 
 Airbridge creates virtual DLNA renderers that forward audio to AirPlay speakers and Chromecast devices. This allows media servers like [Music Assistant](https://music-assistant.io/) to stream to these devices through DLNA.
+
+![Airbridge Dashboard](docs/screenshots/dashboard.png)
 
 ## Why?
 
@@ -17,10 +19,11 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 
 - 🎵 Virtual DLNA renderer per AirPlay/Chromecast zone
 - 📡 Automatic device discovery (mDNS for both AirPlay and Chromecast)
-- 📺 **NEW:** Chromecast support - cast DLNA audio to Chromecast devices
+- 📺 Chromecast support - cast DLNA audio to Chromecast devices
+- 🌐 Web admin interface with real-time status updates via WebSocket
+- 🎛️ Live playback status (Playing/Idle/Paused) with instant UI updates
 - ⚙️ YAML configuration for device filtering and aliases
 - 🔊 Volume control support
-- 🌐 Web admin interface for managing devices
 - 🐳 Docker deployment with Unraid support
 - ✅ Comprehensive test suite with CI/CD
 
@@ -31,8 +34,9 @@ Some AirPlay devices (like [Juke Audio](https://jukeaudio.com/) multi-zone speak
 ### What works:
 - DLNA renderer creation and discovery
 - Audio streaming to AirPlay devices
-- **Chromecast as output target** (URL-based media playback)
-- Web admin interface
+- Chromecast as output target (URL-based media playback)
+- Web admin interface with live status updates
+- Real-time playback state via WebSocket
 - Docker/Unraid/Home Assistant deployment
 - Full test suite with CI/CD pipeline
 
@@ -175,6 +179,17 @@ devices:
 2. In Music Assistant, go to Settings → Players
 3. You should see "Airbridge (Device Name)" devices appear as DLNA players
 4. Select a device and start playing music!
+
+## Web Admin Interface
+
+The web admin (`--web` mode) provides a modern UI for managing renderers:
+
+- **Real-time status** - See which renderers are Playing, Idle, or Paused (updates via WebSocket)
+- **Easy renderer creation** - Click "New Renderer" to create a virtual DLNA device
+- **Device discovery** - Automatically finds AirPlay and Chromecast devices on your network
+- **Full control** - Start, stop, restart, enable/disable, or delete renderers
+
+![Create Renderer Form](docs/screenshots/create-renderer.png)
 
 ## Docker
 

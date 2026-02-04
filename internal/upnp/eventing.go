@@ -16,12 +16,12 @@ import (
 
 // Subscription represents a UPnP event subscriber.
 type Subscription struct {
-	SID        string
-	Callback   string
-	Timeout    time.Duration
-	ExpiresAt  time.Time
-	ServiceID  string
-	SeqNumber  uint32
+	SID       string
+	Callback  string
+	Timeout   time.Duration
+	ExpiresAt time.Time
+	ServiceID string
+	SeqNumber uint32
 }
 
 // EventManager manages UPnP event subscriptions and notifications.

@@ -1,0 +1,90 @@
+<!-- New Renderer Form -->
+<div id="create-renderer-form" class="bg-white rounded-lg shadow p-6 mb-8">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold text-gray-800">Create New Renderer</h2>
+        <button 
+            type="button"
+            onclick="document.getElementById('create-renderer-form').remove(); document.getElementById('new-renderer-btn').classList.remove('hidden');"
+            class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    
+    <form hx-post="/admin/renderers" hx-target="body" hx-swap="outerHTML" class="space-y-4">
+        <!-- Emulation Type -->
+        <div>
+            <label for="emulation_type" class="block text-sm font-medium text-gray-700 mb-1">Emulation Type</label>
+            <select 
+                name="emulation_type" 
+                id="emulation_type"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="dlna" selected>DLNA/UPnP Renderer</option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Protocol that media servers will use to connect</p>
+        </div>
+
+        <!-- Renderer Name -->
+        <div>
+            <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Renderer Name</label>
+            <input 
+                type="text" 
+                name="name" 
+                id="name"
+                placeholder="e.g., Living Room Speaker"
+                required
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <p class="mt-1 text-xs text-gray-500">Name that will be broadcast to media servers</p>
+        </div>
+
+        <!-- Target Device -->
+        <div>
+            <label for="device_id" class="block text-sm font-medium text-gray-700 mb-1">Target Device</label>
+            {{if .Devices}}
+            <select 
+                name="device_id" 
+                id="device_id"
+                required
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">Select a device...</option>
+                {{range .Devices}}
+                <option value="{{.DeviceID}}" data-type="{{.DeviceType}}" data-name="{{.Name}}">
+                    {{.Name}} ({{.DeviceType}}) - {{.Host}}
+                </option>
+                {{end}}
+            </select>
+            <input type="hidden" name="device_type" id="device_type" value="airplay">
+            <input type="hidden" name="target_name" id="target_name" value="">
+            <script>
+                document.getElementById('device_id').addEventListener('change', function() {
+                    var selected = this.options[this.selectedIndex];
+                    document.getElementById('device_type').value = selected.dataset.type || 'airplay';
+                    document.getElementById('target_name').value = selected.dataset.name || '';
+                });
+            </script>
+            <p class="mt-1 text-xs text-gray-500">AirPlay or Chromecast device to forward audio to</p>
+            {{else}}
+            <div class="text-sm text-gray-500 py-2">
+                <p>No devices found. Make sure your AirPlay/Chromecast devices are on the same network.</p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Submit -->
+        <div class="flex justify-end space-x-3 pt-2">
+            <button 
+                type="button"
+                onclick="document.getElementById('create-renderer-form').remove(); document.getElementById('new-renderer-btn').classList.remove('hidden');"
+                class="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                Cancel
+            </button>
+            <button 
+                type="submit"
+                {{if not .Devices}}disabled{{end}}
+                class="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Create Renderer
+            </button>
+        </div>
+    </form>
+</div>

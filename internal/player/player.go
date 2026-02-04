@@ -78,11 +78,11 @@ func (p *RAOPPlayer) Play(ctx context.Context, uri string, volume int) error {
 		"-reconnect_delay_max", "5",
 		"-i", uri,
 		"-filter_complex", "[0][1]concat=n=2:v=0:a=1", // Concat silence + audio
-		"-f", "s16le",      // Raw PCM, 16-bit signed little-endian
-		"-ar", "44100",     // Sample rate: 44.1 kHz
-		"-ac", "2",         // Channels: stereo
+		"-f", "s16le", // Raw PCM, 16-bit signed little-endian
+		"-ar", "44100", // Sample rate: 44.1 kHz
+		"-ac", "2", // Channels: stereo
 		"-acodec", "pcm_s16le",
-		"-",                // Output to stdout
+		"-", // Output to stdout
 	}
 
 	p.ffmpeg = exec.CommandContext(playCtx, "ffmpeg", ffmpegArgs...)
@@ -191,12 +191,12 @@ func (p *RAOPPlayer) SetVolume(ctx context.Context, volume int) error {
 
 	log.Printf("RAOP SetVolume: %d (will apply on next stream)", volume)
 	p.volume = volume
-	
+
 	// TODO: cliraop doesn't support dynamic volume changes.
 	// Would need to either:
 	// 1. Fork cliraop to add 'v' command to interactive mode
 	// 2. Build native Go RAOP client with SET_PARAMETER support
-	
+
 	return nil
 }
 
@@ -211,7 +211,7 @@ func (NullPlayer) Play(ctx context.Context, uri string, volume int) error {
 		return fmt.Errorf("fetch failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	n, _ := io.Copy(io.Discard, resp.Body)
 	log.Printf("[NullPlayer] Streamed %d bytes", n)
 	return nil

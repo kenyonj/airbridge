@@ -23,20 +23,20 @@ const (
 
 // AirPlayDevice represents a discovered AirPlay device.
 type AirPlayDevice struct {
-	Name       string            // Friendly name (e.g., "Kitchen")
-	DeviceID   string            // MAC address-based ID (e.g., "C6F4891B35E7")
-	Host       string            // Hostname or IP
-	Port       int               // RAOP port
-	Model      string            // Device model (e.g., "Shairport Sync")
-	Features   uint64            // Feature flags
-	TXTRecord  map[string]string // Raw TXT record fields
-	LastSeen   time.Time         // When the device was last discovered
+	Name      string            // Friendly name (e.g., "Kitchen")
+	DeviceID  string            // MAC address-based ID (e.g., "C6F4891B35E7")
+	Host      string            // Hostname or IP
+	Port      int               // RAOP port
+	Model     string            // Device model (e.g., "Shairport Sync")
+	Features  uint64            // Feature flags
+	TXTRecord map[string]string // Raw TXT record fields
+	LastSeen  time.Time         // When the device was last discovered
 }
 
 // Service manages discovery of AirPlay devices on the network.
 type Service struct {
-	devices     map[string]*AirPlayDevice     // keyed by DeviceID
-	chromecasts map[string]*ChromecastDevice  // keyed by DeviceID
+	devices     map[string]*AirPlayDevice    // keyed by DeviceID
+	chromecasts map[string]*ChromecastDevice // keyed by DeviceID
 	mu          sync.RWMutex
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -76,7 +76,7 @@ func (s *Service) browseLoop() {
 		}
 
 		entries := make(chan *zeroconf.ServiceEntry)
-		
+
 		// Process entries in a goroutine
 		done := make(chan struct{})
 		go func() {
@@ -98,11 +98,11 @@ func (s *Service) browseLoop() {
 		if err != nil {
 			log.Printf("Browse error: %v", err)
 		}
-		
+
 		// Wait for context to finish
 		<-browseCtx.Done()
 		cancel()
-		
+
 		// Wait for entry processing to complete
 		<-done
 
@@ -145,7 +145,7 @@ func (s *Service) GetDevice(id string) *AirPlayDevice {
 func (s *Service) GetDeviceByName(name string) *AirPlayDevice {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	for _, d := range s.devices {
 		if strings.EqualFold(d.Name, name) {
 			return d
@@ -177,7 +177,7 @@ func (s *Service) GetChromecast(id string) *ChromecastDevice {
 func (s *Service) GetChromecastByName(name string) *ChromecastDevice {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	for _, d := range s.chromecasts {
 		if strings.EqualFold(d.Name, name) {
 			return d
@@ -312,7 +312,7 @@ func (s *Service) browseChromecastLoop() {
 		}
 
 		entries := make(chan *zeroconf.ServiceEntry)
-		
+
 		done := make(chan struct{})
 		go func() {
 			for entry := range entries {
@@ -332,7 +332,7 @@ func (s *Service) browseChromecastLoop() {
 		if err != nil {
 			log.Printf("Chromecast browse error: %v", err)
 		}
-		
+
 		<-browseCtx.Done()
 		cancel()
 		<-done

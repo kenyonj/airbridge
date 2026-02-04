@@ -42,6 +42,21 @@
         </div>
     </div>
 
+    <!-- New Renderer Button -->
+    <div id="new-renderer-btn">
+        <button 
+            hx-get="/admin/renderers/new"
+            hx-target="#new-renderer-btn"
+            hx-swap="afterend"
+            onclick="this.parentElement.classList.add('hidden')"
+            class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <span class="font-medium">New Renderer</span>
+        </button>
+    </div>
+
     <!-- Configured Renderers -->
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
@@ -50,11 +65,11 @@
         </div>
         
         {{if .Renderers}}
-        <div class="space-y-3" id="renderer-list">
+        <div class="space-y-3" id="renderer-list" hx-get="/admin/renderers" hx-trigger="refresh from:body" hx-swap="outerHTML">
             {{range .Renderers}}
             <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border {{if .Running}}border-green-300{{else if .Enabled}}border-yellow-200{{else}}border-gray-200{{end}}">
                 <div class="flex items-center space-x-4">
-                    <div class="w-3 h-3 rounded-full {{if .Running}}bg-green-500 animate-pulse{{else if .Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
+                    <div class="w-3 h-3 rounded-full {{if eq .TransportState "PLAYING"}}bg-blue-500 animate-pulse{{else if .Running}}bg-green-500{{else if .Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
                     <div class="flex-1">
                         <div 
                             class="font-medium text-gray-800 cursor-pointer hover:text-indigo-600 hover:underline"
@@ -65,8 +80,8 @@
                             {{.Name}}
                         </div>
                         <div class="text-sm text-gray-500">→ {{.AirPlayName}} (Port {{.Port}})</div>
-                        <div class="text-xs {{if .Running}}text-green-600{{else if .Enabled}}text-yellow-600{{else}}text-gray-400{{end}}">
-                            {{if .Running}}Running{{else if .Enabled}}Enabled (not running){{else}}Disabled{{end}}
+                        <div class="text-xs {{if eq .TransportState "PLAYING"}}text-blue-600{{else if .Running}}text-green-600{{else if .Enabled}}text-yellow-600{{else}}text-gray-400{{end}}">
+                            {{if eq .TransportState "PLAYING"}}Playing{{else if eq .TransportState "PAUSED_PLAYBACK"}}Paused{{else if .Running}}Idle{{else if .Enabled}}Enabled (not running){{else}}Disabled{{end}}
                         </div>
                         <!-- DLNA URL with copy button -->
                         <div class="mt-2 flex items-center space-x-2">
@@ -138,33 +153,47 @@
         {{end}}
     </div>
 
-    <!-- Available Target Devices -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-semibold text-gray-800">Available Targets</h2>
-            <button 
-                hx-get="/admin/devices"
-                hx-target="#device-list"
-                hx-swap="innerHTML"
-                hx-indicator="#refresh-spinner"
-                class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center space-x-1">
-                <span id="refresh-spinner" class="htmx-indicator">
-                    <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+    <!-- Available Target Devices (Collapsible) -->
+    <div class="bg-white rounded-lg shadow">
+        <button 
+            type="button"
+            onclick="var content = document.getElementById('devices-content'); var arrow = document.getElementById('devices-arrow'); content.classList.toggle('hidden'); arrow.classList.toggle('rotate-180');"
+            class="w-full p-6 flex justify-between items-center text-left hover:bg-gray-50 transition-colors rounded-lg">
+            <div class="flex items-center space-x-2">
+                <h2 class="text-lg font-semibold text-gray-800">Available Targets</h2>
+                <span class="text-sm text-gray-500">({{.DeviceCount}} devices)</span>
+            </div>
+            <svg id="devices-arrow" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        
+        <div id="devices-content" class="hidden px-6 pb-6">
+            <div class="flex justify-end mb-4">
+                <button 
+                    hx-get="/admin/devices"
+                    hx-target="#device-list"
+                    hx-swap="innerHTML"
+                    hx-indicator="#refresh-spinner"
+                    class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center space-x-1">
+                    <span id="refresh-spinner" class="htmx-indicator">
+                        <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                    </span>
+                    <span>Refresh</span>
+                </button>
+            </div>
+            
+            <div id="device-list" hx-get="/admin/devices" hx-trigger="revealed, every 30s" hx-swap="innerHTML">
+                <div class="text-center py-4 text-gray-500">
+                    <svg class="animate-spin h-6 w-6 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
-                </span>
-                <span>Refresh</span>
-            </button>
-        </div>
-        
-        <div id="device-list" hx-get="/admin/devices" hx-trigger="load, every 30s" hx-swap="innerHTML">
-            <div class="text-center py-4 text-gray-500">
-                <svg class="animate-spin h-6 w-6 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <p class="mt-2">Discovering devices...</p>
+                    <p class="mt-2">Discovering devices...</p>
+                </div>
             </div>
         </div>
     </div>

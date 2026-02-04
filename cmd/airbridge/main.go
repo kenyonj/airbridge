@@ -216,7 +216,7 @@ func generateTone(frequency float64, durationSec int) []byte {
 	for i := 0; i < samples; i++ {
 		t := float64(i) / float64(sampleRate)
 		value := int16(amplitude * 32767 * math.Sin(2*math.Pi*frequency*t))
-		
+
 		// Little-endian 16-bit stereo
 		offset := i * 4
 		buf[offset] = byte(value)
@@ -472,6 +472,9 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 		fmt.Fprintf(os.Stderr, "Failed to create web server: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Wire up state broadcasting from bridge to web clients
+	br.SetStateBroadcaster(webServer.BroadcastStateUpdate)
 
 	// Setup HTTP server for web admin
 	mux := http.NewServeMux()

@@ -26,18 +26,21 @@ const (
 
 // RendererInstance represents a single embedded renderer.
 type RendererInstance struct {
-	ID            string
-	Name          string
-	DeviceType    string // "airplay" or "chromecast"
-	AirPlayName   string // Legacy: for AirPlay devices
-	DeviceName    string // Generic device name
-	Device        *discovery.AirPlayDevice     // AirPlay device (nil for Chromecast)
-	Chromecast    *discovery.ChromecastDevice  // Chromecast device (nil for AirPlay)
-	State         *state.PlayerState
-	Player        upnp.Player // Generic player interface
-	EventManager  *upnp.EventManager
-	cancel        context.CancelFunc
+	ID           string
+	Name         string
+	DeviceType   string                      // "airplay" or "chromecast"
+	AirPlayName  string                      // Legacy: for AirPlay devices
+	DeviceName   string                      // Generic device name
+	Device       *discovery.AirPlayDevice    // AirPlay device (nil for Chromecast)
+	Chromecast   *discovery.ChromecastDevice // Chromecast device (nil for AirPlay)
+	State        *state.PlayerState
+	Player       upnp.Player // Generic player interface
+	EventManager *upnp.EventManager
+	cancel       context.CancelFunc
 }
+
+// StateBroadcaster is called when renderer state changes.
+type StateBroadcaster func(rendererID, transportState string, running bool)
 
 // Bridge is a unified DLNA bridge with multiple embedded renderers.
 type Bridge struct {
@@ -53,6 +56,9 @@ type Bridge struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// Callback for broadcasting state changes to web UI
+	onStateChange StateBroadcaster
 }
 
 // NewBridge creates a new unified bridge.
@@ -63,6 +69,13 @@ func NewBridge(db *database.DB, disco *discovery.Service, port int) *Bridge {
 		port:      port,
 		renderers: make(map[string]*RendererInstance),
 	}
+}
+
+// SetStateBroadcaster sets the callback for state changes.
+func (b *Bridge) SetStateBroadcaster(cb StateBroadcaster) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.onStateChange = cb
 }
 
 // Start initializes and starts the bridge.
@@ -154,6 +167,15 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 		State:        state.New(ctx),
 		EventManager: upnp.NewEventManager(),
 		cancel:       cancel,
+	}
+
+	// Set up state change callback for WebSocket broadcast
+	rendererID := r.ID
+	if b.onStateChange != nil {
+		cb := b.onStateChange
+		inst.State.SetOnStateChange(func(s state.TransportState) {
+			cb(rendererID, string(s), true)
+		})
 	}
 
 	// Get device and create appropriate player based on device type
@@ -262,6 +284,16 @@ func (b *Bridge) Uptime() time.Duration {
 // LocalIP returns the local IP address.
 func (b *Bridge) LocalIP() string {
 	return b.localIP
+}
+
+// GetTransportState returns the transport state for a renderer ("PLAYING", "STOPPED", etc).
+func (b *Bridge) GetTransportState(id string) string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if r, ok := b.renderers[id]; ok && r.State != nil {
+		return string(r.State.GetTransportState())
+	}
+	return ""
 }
 
 // StartRenderer starts a renderer by ID.

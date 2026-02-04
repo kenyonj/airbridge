@@ -106,13 +106,13 @@ func TestParseRAOPEntry(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		entry      *zeroconf.ServiceEntry
-		wantNil    bool
-		wantName   string
-		wantID     string
-		wantModel  string
-		wantPort   int
+		name      string
+		entry     *zeroconf.ServiceEntry
+		wantNil   bool
+		wantName  string
+		wantID    string
+		wantModel string
+		wantPort  int
 	}{
 		{
 			name:      "valid entry",

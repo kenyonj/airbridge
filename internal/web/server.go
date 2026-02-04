@@ -29,6 +29,7 @@ type Server struct {
 	renderers RendererController
 	templates *template.Template
 	basePort  int
+	hub       *Hub
 }
 
 // DeviceInfo represents a device (AirPlay or Chromecast) for the UI.
@@ -45,8 +46,9 @@ type DeviceInfo struct {
 // RendererView represents a renderer with runtime status for the UI.
 type RendererView struct {
 	database.Renderer
-	Running bool
-	DLNAURL string
+	Running        bool
+	DLNAURL        string
+	TransportState string // "PLAYING", "STOPPED", "PAUSED_PLAYBACK", etc.
 }
 
 // RendererController is the interface for managing renderer lifecycle.
@@ -58,6 +60,7 @@ type RendererController interface {
 	StartRenderer(id string) error
 	StopRenderer(id string)
 	RestartAll()
+	GetTransportState(id string) string
 }
 
 // NewServer creates a new web server.
@@ -67,12 +70,16 @@ func NewServer(db *database.DB, disco *discovery.Service, renderers RendererCont
 		return nil, fmt.Errorf("parse templates: %w", err)
 	}
 
+	hub := NewHub()
+	go hub.Run()
+
 	return &Server{
 		db:        db,
 		disco:     disco,
 		renderers: renderers,
 		templates: tmpl,
 		basePort:  basePort,
+		hub:       hub,
 	}, nil
 }
 
@@ -85,6 +92,17 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/renderers/", s.handleRendererAction)
 	mux.HandleFunc("/admin/server/status", s.handleServerStatus)
 	mux.HandleFunc("/admin/server/restart", s.handleServerRestart)
+	mux.HandleFunc("/admin/ws", s.hub.HandleWebSocket)
+}
+
+// BroadcastStateUpdate sends a state update to all WebSocket clients.
+func (s *Server) BroadcastStateUpdate(rendererID, transportState string, running bool) {
+	s.hub.Broadcast(StateUpdate{
+		Type:           "state_update",
+		RendererID:     rendererID,
+		TransportState: transportState,
+		Running:        running,
+	})
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -99,9 +117,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	var views []RendererView
 	for _, r := range renderers {
 		views = append(views, RendererView{
-			Renderer: r,
-			Running:  s.renderers.IsRunning(r.ID),
-			DLNAURL:  fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
+			Renderer:       r,
+			Running:        s.renderers.IsRunning(r.ID),
+			DLNAURL:        fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
+			TransportState: s.renderers.GetTransportState(r.ID),
 		})
 	}
 
@@ -237,6 +256,12 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 		action = parts[1]
 	}
 
+	// Handle /admin/renderers/new specially
+	if id == "new" && r.Method == "GET" {
+		s.newRendererForm(w, r)
+		return
+	}
+
 	switch {
 	case action == "toggle" && r.Method == "POST":
 		s.toggleRenderer(w, r, id)
@@ -257,11 +282,68 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) newRendererForm(w http.ResponseWriter, r *http.Request) {
+	// Get all available devices for the dropdown
+	airplayDevices := s.disco.GetDevices()
+	chromecastDevices := s.disco.GetChromecasts()
+	renderers, _ := s.db.ListRenderers()
+
+	// Build a set of configured device IDs
+	configuredIDs := make(map[string]bool)
+	for _, r := range renderers {
+		configuredIDs[r.AirPlayDeviceID] = true
+		if r.DeviceID != "" {
+			configuredIDs[r.DeviceID] = true
+		}
+	}
+
+	// Convert to DeviceInfo, excluding already configured devices
+	var deviceInfos []DeviceInfo
+	for _, d := range airplayDevices {
+		if configuredIDs[d.DeviceID] {
+			continue
+		}
+		deviceInfos = append(deviceInfos, DeviceInfo{
+			DeviceID:   d.DeviceID,
+			DeviceType: "airplay",
+			Name:       d.Name,
+			Host:       d.Host,
+			Port:       d.Port,
+			Model:      d.Model,
+		})
+	}
+	for _, d := range chromecastDevices {
+		if configuredIDs[d.DeviceID] {
+			continue
+		}
+		deviceInfos = append(deviceInfos, DeviceInfo{
+			DeviceID:   d.DeviceID,
+			DeviceType: "chromecast",
+			Name:       d.Name,
+			Host:       d.Host,
+			Port:       d.Port,
+			Model:      d.Model,
+		})
+	}
+
+	// Sort by name
+	sort.Slice(deviceInfos, func(i, j int) bool {
+		return strings.ToLower(deviceInfos[i].Name) < strings.ToLower(deviceInfos[j].Name)
+	})
+
+	data := map[string]interface{}{
+		"Devices": deviceInfos,
+	}
+
+	s.renderPartial(w, "renderer_create.html", data)
+}
+
 func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	deviceID := r.FormValue("device_id")
 	deviceType := r.FormValue("device_type")
 	name := r.FormValue("name")
+	targetName := r.FormValue("target_name") // From new form
 
 	if deviceID == "" || name == "" {
 		http.Error(w, "Missing device_id or name", http.StatusBadRequest)
@@ -285,26 +367,32 @@ func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 
 	// Find the device to get its name based on type
 	var deviceName string
-	switch deviceType {
-	case "chromecast":
-		device := s.disco.GetChromecast(deviceID)
-		if device != nil {
-			deviceName = device.Name
-		} else {
-			deviceName = name
-		}
-	default: // "airplay"
-		device := s.disco.GetDevice(deviceID)
-		if device != nil {
-			deviceName = device.Name
-		} else {
-			deviceName = name
+	if targetName != "" {
+		// New form provides target_name
+		deviceName = targetName
+	} else {
+		// Legacy form - look up device name
+		switch deviceType {
+		case "chromecast":
+			device := s.disco.GetChromecast(deviceID)
+			if device != nil {
+				deviceName = device.Name
+			} else {
+				deviceName = name
+			}
+		default: // "airplay"
+			device := s.disco.GetDevice(deviceID)
+			if device != nil {
+				deviceName = device.Name
+			} else {
+				deviceName = name
+			}
 		}
 	}
 
 	renderer := &database.Renderer{
 		ID:              id,
-		Name:            fmt.Sprintf("Airbridge (%s)", name),
+		Name:            name, // Use the user-provided name directly
 		DeviceType:      deviceType,
 		DeviceID:        deviceID,
 		DeviceName:      deviceName,
@@ -339,11 +427,14 @@ func (s *Server) listRenderers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build renderer views with running status
+	localIP := s.renderers.LocalIP()
 	var views []RendererView
 	for _, r := range renderers {
 		views = append(views, RendererView{
-			Renderer: r,
-			Running:  s.renderers.IsRunning(r.ID),
+			Renderer:       r,
+			Running:        s.renderers.IsRunning(r.ID),
+			DLNAURL:        fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
+			TransportState: s.renderers.GetTransportState(r.ID),
 		})
 	}
 

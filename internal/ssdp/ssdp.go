@@ -17,9 +17,9 @@ const (
 
 // UPnP service types
 const (
-	DeviceType     = "urn:schemas-upnp-org:device:MediaRenderer:1"
+	DeviceType      = "urn:schemas-upnp-org:device:MediaRenderer:1"
 	AVTransportType = "urn:schemas-upnp-org:service:AVTransport:1"
-	RenderingType  = "urn:schemas-upnp-org:service:RenderingControl:1"
+	RenderingType   = "urn:schemas-upnp-org:service:RenderingControl:1"
 )
 
 // Announce sends SSDP NOTIFY messages to advertise the device.
@@ -123,12 +123,12 @@ func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, dev
 	buf := make([]byte, 8192)
 
 	validTargets := map[string]bool{
-		"ssdp:all":          true,
-		"upnp:rootdevice":   true,
-		DeviceType:          true,
-		AVTransportType:     true,
-		RenderingType:       true,
-		deviceUUID:          true,
+		"ssdp:all":        true,
+		"upnp:rootdevice": true,
+		DeviceType:        true,
+		AVTransportType:   true,
+		RenderingType:     true,
+		deviceUUID:        true,
 	}
 
 	for {
