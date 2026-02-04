@@ -31,6 +31,12 @@ type Renderer struct {
 	CastEnabled     bool      `json:"cast_enabled"` // Chromecast receiver enabled
 	CastPort        int       `json:"cast_port"`    // Chromecast receiver port (default 8009)
 	CreatedAt       time.Time `json:"created_at"`
+	// Volume passthrough for AirPlay (external API control)
+	VolumeURL      string `json:"volume_url"`       // External volume API URL (with {{volume}} placeholder)
+	VolumeMethod   string `json:"volume_method"`    // HTTP method (GET, POST, PUT)
+	VolumeBody     string `json:"volume_body"`      // Request body template (with {{volume}} placeholder)
+	VolumeAuthUser string `json:"volume_auth_user"` // Basic auth username
+	VolumeAuthPass string `json:"volume_auth_pass"` // Basic auth password
 }
 
 // Open opens or creates the database at the given path.
@@ -93,6 +99,12 @@ func (db *DB) migrate() error {
 	// Add Chromecast receiver columns
 	db.addColumnIfNotExists("renderers", "cast_enabled", "INTEGER DEFAULT 0")
 	db.addColumnIfNotExists("renderers", "cast_port", "INTEGER DEFAULT 8009")
+	// Add volume passthrough columns for AirPlay
+	db.addColumnIfNotExists("renderers", "volume_url", "TEXT NOT NULL DEFAULT ''")
+	db.addColumnIfNotExists("renderers", "volume_method", "TEXT NOT NULL DEFAULT 'PUT'")
+	db.addColumnIfNotExists("renderers", "volume_body", "TEXT NOT NULL DEFAULT ''")
+	db.addColumnIfNotExists("renderers", "volume_auth_user", "TEXT NOT NULL DEFAULT ''")
+	db.addColumnIfNotExists("renderers", "volume_auth_pass", "TEXT NOT NULL DEFAULT ''")
 
 	log.Println("Database migrations complete")
 	return nil
@@ -125,7 +137,12 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 		       COALESCE(device_id, '') as device_id,
 		       COALESCE(device_name, '') as device_name,
 		       COALESCE(cast_enabled, 0) as cast_enabled,
-		       COALESCE(cast_port, 8009) as cast_port
+		       COALESCE(cast_port, 8009) as cast_port,
+		       COALESCE(volume_url, '') as volume_url,
+		       COALESCE(volume_method, 'PUT') as volume_method,
+		       COALESCE(volume_body, '') as volume_body,
+		       COALESCE(volume_auth_user, '') as volume_auth_user,
+		       COALESCE(volume_auth_pass, '') as volume_auth_pass
 		FROM renderers 
 		ORDER BY created_at ASC
 	`)
@@ -139,7 +156,8 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 		var r Renderer
 		var enabled, castEnabled int
 		if err := rows.Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
-			&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort); err != nil {
+			&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort,
+			&r.VolumeURL, &r.VolumeMethod, &r.VolumeBody, &r.VolumeAuthUser, &r.VolumeAuthPass); err != nil {
 			return nil, err
 		}
 		r.Enabled = enabled == 1
@@ -166,10 +184,16 @@ func (db *DB) GetRenderer(id string) (*Renderer, error) {
 		       COALESCE(device_id, '') as device_id,
 		       COALESCE(device_name, '') as device_name,
 		       COALESCE(cast_enabled, 0) as cast_enabled,
-		       COALESCE(cast_port, 8009) as cast_port
+		       COALESCE(cast_port, 8009) as cast_port,
+		       COALESCE(volume_url, '') as volume_url,
+		       COALESCE(volume_method, 'PUT') as volume_method,
+		       COALESCE(volume_body, '') as volume_body,
+		       COALESCE(volume_auth_user, '') as volume_auth_user,
+		       COALESCE(volume_auth_pass, '') as volume_auth_pass
 		FROM renderers WHERE id = ?
 	`, id).Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
-		&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort)
+		&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort,
+		&r.VolumeURL, &r.VolumeMethod, &r.VolumeBody, &r.VolumeAuthUser, &r.VolumeAuthPass)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -235,9 +259,11 @@ func (db *DB) UpdateRenderer(r *Renderer) error {
 	}
 	_, err := db.conn.Exec(`
 		UPDATE renderers SET name = ?, airplay_device_id = ?, airplay_name = ?, port = ?, enabled = ?,
-		       device_type = ?, device_id = ?, device_name = ?
+		       device_type = ?, device_id = ?, device_name = ?,
+		       volume_url = ?, volume_method = ?, volume_body = ?, volume_auth_user = ?, volume_auth_pass = ?
 		WHERE id = ?
-	`, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, deviceType, deviceID, deviceName, r.ID)
+	`, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, deviceType, deviceID, deviceName,
+		r.VolumeURL, r.VolumeMethod, r.VolumeBody, r.VolumeAuthUser, r.VolumeAuthPass, r.ID)
 	return err
 }
 

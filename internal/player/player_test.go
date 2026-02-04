@@ -241,3 +241,42 @@ func TestHasExtension(t *testing.T) {
 		})
 	}
 }
+
+func TestRAOPPlayer_VolumePassthrough(t *testing.T) {
+	device := &discovery.Device{
+		DeviceType: discovery.DeviceTypeAirPlay,
+		Host:       "192.168.1.100",
+		Port:       7000,
+	}
+
+	player := NewRAOPPlayer(device)
+
+	// Set volume passthrough config
+	player.SetVolumePassthrough(&VolumePassthrough{
+		URL:      "http://localhost:9999/api/zones/test/volume",
+		Method:   "PUT",
+		Body:     `{"volume": {{volume}}}`,
+		AuthUser: "Admin",
+		AuthPass: "password",
+	})
+
+	// Verify passthrough config is set
+	if player.volumePassthrough == nil {
+		t.Fatal("expected volume passthrough to be set")
+	}
+	if player.volumePassthrough.URL != "http://localhost:9999/api/zones/test/volume" {
+		t.Errorf("unexpected URL: %s", player.volumePassthrough.URL)
+	}
+	if player.volumePassthrough.Method != "PUT" {
+		t.Errorf("unexpected method: %s", player.volumePassthrough.Method)
+	}
+
+	// SetVolume should work even if passthrough fails (it's best-effort)
+	err := player.SetVolume(context.Background(), 75)
+	if err != nil {
+		t.Errorf("SetVolume failed: %v", err)
+	}
+	if player.volume != 75 {
+		t.Errorf("volume = %d, want 75", player.volume)
+	}
+}

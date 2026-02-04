@@ -295,6 +295,8 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 		s.editRendererForm(w, r, id)
 	case action == "rename" && r.Method == "POST":
 		s.renameRenderer(w, r, id)
+	case action == "update" && r.Method == "POST":
+		s.updateRenderer(w, r, id)
 	case action == "" && r.Method == "DELETE":
 		s.deleteRenderer(w, r, id)
 	default:
@@ -562,6 +564,53 @@ func (s *Server) renameRenderer(w http.ResponseWriter, r *http.Request, id strin
 	}
 
 	log.Printf("Renamed renderer %s to: %s", id, name)
+	s.listRenderers(w, r)
+}
+
+func (s *Server) updateRenderer(w http.ResponseWriter, r *http.Request, id string) {
+	_ = r.ParseForm()
+
+	renderer, err := s.db.GetRenderer(id)
+	if err != nil || renderer == nil {
+		http.Error(w, "Renderer not found", http.StatusNotFound)
+		return
+	}
+
+	// Update name
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		http.Error(w, "Name cannot be empty", http.StatusBadRequest)
+		return
+	}
+	renderer.Name = name
+
+	// Update volume passthrough fields (only for AirPlay)
+	if renderer.DeviceType == "airplay" || renderer.DeviceType == "" {
+		renderer.VolumeURL = strings.TrimSpace(r.FormValue("volume_url"))
+		renderer.VolumeMethod = r.FormValue("volume_method")
+		if renderer.VolumeMethod == "" {
+			renderer.VolumeMethod = "PUT"
+		}
+		renderer.VolumeBody = r.FormValue("volume_body")
+		renderer.VolumeAuthUser = r.FormValue("volume_auth_user")
+		renderer.VolumeAuthPass = r.FormValue("volume_auth_pass")
+	}
+
+	if err := s.db.UpdateRenderer(renderer); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Updated renderer %s: name=%s, volume_url=%s", id, name, renderer.VolumeURL)
+
+	// Restart the renderer to apply new volume passthrough config
+	if s.renderers.IsRunning(id) {
+		s.renderers.StopRenderer(id)
+		if err := s.renderers.StartRenderer(id); err != nil {
+			log.Printf("Failed to restart renderer after update: %v", err)
+		}
+	}
+
 	s.listRenderers(w, r)
 }
 

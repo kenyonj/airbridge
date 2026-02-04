@@ -215,7 +215,19 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 		inst.Player = player.NewChromecastPlayer(device)
 		log.Printf("Added Chromecast renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
 	default: // "airplay"
-		inst.Player = player.NewRAOPPlayer(device)
+		raopPlayer := player.NewRAOPPlayer(device)
+		// Configure volume passthrough if set
+		if r.VolumeURL != "" {
+			raopPlayer.SetVolumePassthrough(&player.VolumePassthrough{
+				URL:      r.VolumeURL,
+				Method:   r.VolumeMethod,
+				Body:     r.VolumeBody,
+				AuthUser: r.VolumeAuthUser,
+				AuthPass: r.VolumeAuthPass,
+			})
+			log.Printf("Configured volume passthrough for %s: %s", r.Name, r.VolumeURL)
+		}
+		inst.Player = raopPlayer
 		log.Printf("Added AirPlay renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
 	}
 

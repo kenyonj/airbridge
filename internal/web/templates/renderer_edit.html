@@ -1,26 +1,88 @@
 <div class="p-4 bg-white rounded-lg border border-indigo-300 shadow-sm">
-    <form hx-post="/admin/renderers/{{.Renderer.ID}}/rename" hx-target="#renderer-list" hx-swap="outerHTML">
-        <div class="flex items-center space-x-3">
-            <div class="w-3 h-3 rounded-full {{if .Renderer.Running}}bg-green-500 animate-pulse{{else if .Renderer.Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
-            <input 
-                type="text" 
-                name="name" 
-                value="{{.Renderer.Name}}"
-                class="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                autofocus
-                required>
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-                Save
-            </button>
-            <button 
-                type="button"
-                hx-get="/admin/renderers"
-                hx-target="#renderer-list"
-                hx-swap="outerHTML"
-                class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
-                Cancel
-            </button>
+    <form hx-post="/admin/renderers/{{.Renderer.ID}}/update" hx-target="#renderer-list" hx-swap="outerHTML">
+        <div class="space-y-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 rounded-full {{if .Renderer.Running}}bg-green-500 animate-pulse{{else if .Renderer.Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
+                <input 
+                    type="text" 
+                    name="name" 
+                    value="{{.Renderer.Name}}"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autofocus
+                    required>
+            </div>
+            <div class="ml-6 text-sm text-gray-500">→ {{.Renderer.DeviceName}} (Port {{.Renderer.Port}})</div>
+
+            {{if eq .Renderer.DeviceType "airplay"}}
+            <div class="ml-6 border-t pt-4 mt-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Volume Passthrough (Optional)</h4>
+                <p class="text-xs text-gray-500 mb-3">Configure an external API to control volume in real-time. Use <code class="bg-gray-100 px-1 rounded">\{\{volume\}\}</code> as placeholder for 0-100 value.</p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">API URL</label>
+                        <input 
+                            type="text" 
+                            name="volume_url" 
+                            value="{{.Renderer.VolumeURL}}"
+                            placeholder="http://192.168.1.x/api/v3/zones/{zone_id}/volume"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="flex space-x-3">
+                        <div class="w-24">
+                            <label class="block text-xs text-gray-600 mb-1">Method</label>
+                            <select name="volume_method" class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="PUT" {{if eq .Renderer.VolumeMethod "PUT"}}selected{{end}}>PUT</option>
+                                <option value="POST" {{if eq .Renderer.VolumeMethod "POST"}}selected{{end}}>POST</option>
+                                <option value="GET" {{if eq .Renderer.VolumeMethod "GET"}}selected{{end}}>GET</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-600 mb-1">Request Body (JSON)</label>
+                            <input 
+                                type="text" 
+                                name="volume_body" 
+                                value="{{.Renderer.VolumeBody}}"
+                                placeholder='{"volume": \{\{volume\}\}}'
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-600 mb-1">Auth Username</label>
+                            <input 
+                                type="text" 
+                                name="volume_auth_user" 
+                                value="{{.Renderer.VolumeAuthUser}}"
+                                placeholder="Admin"
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-600 mb-1">Auth Password</label>
+                            <input 
+                                type="password" 
+                                name="volume_auth_pass" 
+                                value="{{.Renderer.VolumeAuthPass}}"
+                                placeholder="••••••••"
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+
+            <div class="flex justify-end space-x-2 pt-2">
+                <button 
+                    type="button"
+                    hx-get="/admin/renderers"
+                    hx-target="#renderer-list"
+                    hx-swap="outerHTML"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    Save
+                </button>
+            </div>
         </div>
-        <div class="mt-2 ml-6 text-sm text-gray-500">→ {{.Renderer.AirPlayName}} (Port {{.Renderer.Port}})</div>
     </form>
 </div>

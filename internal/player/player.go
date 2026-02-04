@@ -2,17 +2,28 @@
 package player
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/pkg/raop"
 )
+
+// VolumePassthrough configures external volume control API.
+type VolumePassthrough struct {
+	URL      string // URL with {{volume}} placeholder
+	Method   string // HTTP method (GET, POST, PUT)
+	Body     string // Request body with {{volume}} placeholder
+	AuthUser string // Basic auth username
+	AuthPass string // Basic auth password
+}
 
 // RAOPPlayer streams audio to an AirPlay device via RAOP.
 type RAOPPlayer struct {
@@ -26,6 +37,9 @@ type RAOPPlayer struct {
 	// Current state
 	currentURI string
 	volume     int
+
+	// Volume passthrough for external API control
+	volumePassthrough *VolumePassthrough
 }
 
 // NewRAOPPlayer creates a new RAOP player for the given AirPlay device.
@@ -34,6 +48,13 @@ func NewRAOPPlayer(device *discovery.Device) *RAOPPlayer {
 		device: device,
 		volume: 80,
 	}
+}
+
+// SetVolumePassthrough configures external volume control API.
+func (p *RAOPPlayer) SetVolumePassthrough(vp *VolumePassthrough) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.volumePassthrough = vp
 }
 
 // Play starts streaming audio from the given URI to the AirPlay device.
@@ -185,18 +206,72 @@ func (p *RAOPPlayer) stopInternal() {
 
 // SetVolume adjusts the volume.
 // Note: RAOP volume is set at connection time. Changes take effect on next Play.
+// If volume passthrough is configured, it will also call the external API.
 func (p *RAOPPlayer) SetVolume(ctx context.Context, volume int) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	log.Printf("RAOP SetVolume: %d (will apply on next stream)", volume)
+	log.Printf("RAOP SetVolume: %d", volume)
 	p.volume = volume
 
-	// TODO: cliraop doesn't support dynamic volume changes.
-	// Would need to either:
-	// 1. Fork cliraop to add 'v' command to interactive mode
-	// 2. Build native Go RAOP client with SET_PARAMETER support
+	// Call volume passthrough API if configured
+	if p.volumePassthrough != nil && p.volumePassthrough.URL != "" {
+		if err := p.callVolumePassthrough(ctx, volume); err != nil {
+			log.Printf("Volume passthrough error: %v", err)
+			// Don't return error - passthrough is best-effort
+		}
+	}
 
+	return nil
+}
+
+// callVolumePassthrough makes the HTTP request to the external volume API.
+func (p *RAOPPlayer) callVolumePassthrough(ctx context.Context, volume int) error {
+	vp := p.volumePassthrough
+	volumeStr := fmt.Sprintf("%d", volume)
+
+	// Replace {{volume}} placeholder in URL and body
+	url := strings.ReplaceAll(vp.URL, "{{volume}}", volumeStr)
+	body := strings.ReplaceAll(vp.Body, "{{volume}}", volumeStr)
+
+	method := vp.Method
+	if method == "" {
+		method = "PUT"
+	}
+
+	var bodyReader io.Reader
+	if body != "" {
+		bodyReader = bytes.NewBufferString(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	// Set content type for JSON body
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	// Set basic auth if configured
+	if vp.AuthUser != "" {
+		req.SetBasicAuth(vp.AuthUser, vp.AuthPass)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("Volume passthrough: %s %s -> %d", method, url, resp.StatusCode)
 	return nil
 }
 
