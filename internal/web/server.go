@@ -24,12 +24,32 @@ var templateFS embed.FS
 
 // Server provides the web admin interface.
 type Server struct {
-	db        *database.DB
-	disco     *discovery.Service
+	db        DBInterface
+	disco     DiscoveryInterface
 	renderers RendererController
 	templates *template.Template
 	basePort  int
 	hub       *Hub
+}
+
+// DBInterface defines the database operations needed by the web server.
+type DBInterface interface {
+	ListRenderers() ([]database.Renderer, error)
+	GetRenderer(id string) (*database.Renderer, error)
+	CreateRenderer(r *database.Renderer) error
+	UpdateRenderer(r *database.Renderer) error
+	DeleteRenderer(id string) error
+	GetNextPort(basePort int) (int, error)
+	ToggleRenderer(id string) error
+	RenameRenderer(id, name string) error
+}
+
+// DiscoveryInterface defines the discovery operations needed by the web server.
+type DiscoveryInterface interface {
+	GetDevices() []*discovery.AirPlayDevice
+	GetChromecasts() []*discovery.ChromecastDevice
+	GetDevice(deviceID string) *discovery.AirPlayDevice
+	GetChromecast(deviceID string) *discovery.ChromecastDevice
 }
 
 // DeviceInfo represents a device (AirPlay or Chromecast) for the UI.
@@ -64,7 +84,7 @@ type RendererController interface {
 }
 
 // NewServer creates a new web server.
-func NewServer(db *database.DB, disco *discovery.Service, renderers RendererController, basePort int) (*Server, error) {
+func NewServer(db DBInterface, disco DiscoveryInterface, renderers RendererController, basePort int) (*Server, error) {
 	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)

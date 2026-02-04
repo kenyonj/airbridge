@@ -60,6 +60,7 @@ func main() {
 	testStream := flag.String("test", "", "Test streaming to device (by name or IP:port)")
 	serve := flag.Bool("serve", false, "Run as DLNA renderer server (single device)")
 	webMode := flag.Bool("web", false, "Run with web admin interface")
+	demoMode := flag.Bool("demo", false, "Run web UI with fake data (for development)")
 	target := flag.String("target", "", "Target AirPlay device name (for serve mode)")
 	port := flag.Int("port", defaultPort, "HTTP port for DLNA server (env: AIRBRIDGE_PORT)")
 	dbPath := flag.String("db", defaultDB, "Path to SQLite database (env: AIRBRIDGE_DB)")
@@ -85,6 +86,12 @@ func main() {
 		fmt.Println("\nShutting down...")
 		cancel()
 	}()
+
+	// Demo mode - web UI with fake data
+	if *demoMode {
+		runDemoServer(ctx, *port)
+		return
+	}
 
 	// Web admin mode
 	if *webMode {
@@ -337,6 +344,57 @@ func getLocalIP() string {
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String()
+}
+
+// runDemoServer starts the web UI with fake data for development.
+func runDemoServer(ctx context.Context, httpPort int) {
+	fmt.Printf("Starting Airbridge in DEMO mode on port %d\n", httpPort)
+	fmt.Println("Using fake data - no real devices or database")
+	fmt.Println()
+
+	// Create demo components
+	demoDB := web.NewDemoDB()
+	demoDisco := web.NewDemoDiscovery()
+	demoController := web.NewDemoController()
+
+	// Create web server with demo components
+	webServer, err := web.NewServer(demoDB, demoDisco, demoController, httpPort)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create web server: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Setup HTTP server
+	mux := http.NewServeMux()
+	webServer.RegisterRoutes(mux)
+
+	// Root redirect to admin
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/admin", http.StatusFound)
+			return
+		}
+		http.NotFound(w, r)
+	})
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", httpPort),
+		Handler: httpserver.LogMiddleware(mux),
+	}
+
+	go func() {
+		fmt.Printf("\n🌐 Demo web admin: http://localhost:%d/admin\n", httpPort)
+		fmt.Println("⚠️  DEMO MODE - Changes are not persisted")
+		fmt.Println("Press Ctrl+C to stop.")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "HTTP server error: %v\n", err)
+		}
+	}()
+
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(shutdownCtx)
 }
 
 // runWebServer starts the web admin interface.
