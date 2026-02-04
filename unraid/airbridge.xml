@@ -12,14 +12,23 @@
   <Support>https://github.com/kenyonj/airbridge/issues</Support>
   <Project>https://github.com/kenyonj/airbridge</Project>
   <Overview>
-    Airbridge bridges DLNA/UPnP audio streams to AirPlay (RAOP) devices.
+    Airbridge - Anything → Everywhere
     
-    Creates virtual DLNA renderers that forward audio to AirPlay speakers, allowing media servers like Music Assistant or Plex to stream to AirPlay-only devices through DLNA.
+    Bridge DLNA/UPnP audio streams to AirPlay speakers. Use the web admin UI to discover AirPlay devices on your network and create virtual DLNA renderers that forward audio to them.
     
-    Requires host network mode for mDNS device discovery and SSDP announcements.
+    Perfect for streaming from Music Assistant, Plex, Roon, or any DLNA-compatible media server to AirPlay-only speakers like HomePods, Sonos, or Apple TVs.
+    
+    Features:
+    - Web-based admin interface for easy setup
+    - Auto-discovery of AirPlay devices
+    - Create and manage multiple bridges
+    - Persistent configuration
+    - Experimental Chromecast receiver support
+    
+    Requires host network mode for device discovery.
   </Overview>
   <Category>MediaServer:Music</Category>
-  <WebUI>http://[IP]:[PORT:8200]/admin</WebUI>
+  <WebUI>http://[IP]:[PORT:AIRBRIDGE_PORT]/admin</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/kenyonj/airbridge/main/unraid/airbridge.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/kenyonj/airbridge/main/unraid/airbridge-icon.png</Icon>
   <ExtraParams/>
@@ -30,5 +39,5 @@
   <DonateLink/>
   <Requires/>
   <Config Name="Data Path" Target="/data" Default="/mnt/user/appdata/airbridge" Mode="rw" Description="Persistent storage for database and configuration" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/airbridge</Config>
-  <Config Name="Web Admin Port" Target="AIRBRIDGE_PORT" Default="8200" Description="Port for the web admin interface (change if 8200 is in use)" Type="Variable" Display="always" Required="true" Mask="false">8200</Config>
+  <Config Name="Web Admin Port" Target="AIRBRIDGE_PORT" Default="8200" Description="Port for the web admin interface. Change if 8200 conflicts with another service." Type="Variable" Display="always" Required="true" Mask="false">8200</Config>
 </Container>
