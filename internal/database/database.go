@@ -28,6 +28,8 @@ type Renderer struct {
 	DeviceName      string    `json:"device_name"`       // Generic device name
 	Port            int       `json:"port"`
 	Enabled         bool      `json:"enabled"`
+	CastEnabled     bool      `json:"cast_enabled"` // Chromecast receiver enabled
+	CastPort        int       `json:"cast_port"`    // Chromecast receiver port (default 8009)
 	CreatedAt       time.Time `json:"created_at"`
 }
 
@@ -88,6 +90,9 @@ func (db *DB) migrate() error {
 	db.addColumnIfNotExists("renderers", "device_id", "TEXT NOT NULL DEFAULT ''")
 	// Add generic device_name column
 	db.addColumnIfNotExists("renderers", "device_name", "TEXT NOT NULL DEFAULT ''")
+	// Add Chromecast receiver columns
+	db.addColumnIfNotExists("renderers", "cast_enabled", "INTEGER DEFAULT 0")
+	db.addColumnIfNotExists("renderers", "cast_port", "INTEGER DEFAULT 8009")
 
 	log.Println("Database migrations complete")
 	return nil
@@ -118,7 +123,9 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 		SELECT id, name, airplay_device_id, airplay_name, port, enabled, created_at,
 		       COALESCE(device_type, 'airplay') as device_type,
 		       COALESCE(device_id, '') as device_id,
-		       COALESCE(device_name, '') as device_name
+		       COALESCE(device_name, '') as device_name,
+		       COALESCE(cast_enabled, 0) as cast_enabled,
+		       COALESCE(cast_port, 8009) as cast_port
 		FROM renderers 
 		ORDER BY created_at ASC
 	`)
@@ -130,12 +137,13 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 	var renderers []Renderer
 	for rows.Next() {
 		var r Renderer
-		var enabled int
+		var enabled, castEnabled int
 		if err := rows.Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
-			&r.DeviceType, &r.DeviceID, &r.DeviceName); err != nil {
+			&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort); err != nil {
 			return nil, err
 		}
 		r.Enabled = enabled == 1
+		r.CastEnabled = castEnabled == 1
 		// Backfill generic fields from legacy fields if empty
 		if r.DeviceID == "" {
 			r.DeviceID = r.AirPlayDeviceID
@@ -151,15 +159,17 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 // GetRenderer returns a renderer by ID.
 func (db *DB) GetRenderer(id string) (*Renderer, error) {
 	var r Renderer
-	var enabled int
+	var enabled, castEnabled int
 	err := db.conn.QueryRow(`
 		SELECT id, name, airplay_device_id, airplay_name, port, enabled, created_at,
 		       COALESCE(device_type, 'airplay') as device_type,
 		       COALESCE(device_id, '') as device_id,
-		       COALESCE(device_name, '') as device_name
+		       COALESCE(device_name, '') as device_name,
+		       COALESCE(cast_enabled, 0) as cast_enabled,
+		       COALESCE(cast_port, 8009) as cast_port
 		FROM renderers WHERE id = ?
 	`, id).Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
-		&r.DeviceType, &r.DeviceID, &r.DeviceName)
+		&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -167,6 +177,7 @@ func (db *DB) GetRenderer(id string) (*Renderer, error) {
 		return nil, err
 	}
 	r.Enabled = enabled == 1
+	r.CastEnabled = castEnabled == 1
 	// Backfill generic fields from legacy fields if empty
 	if r.DeviceID == "" {
 		r.DeviceID = r.AirPlayDeviceID
@@ -245,6 +256,22 @@ func (db *DB) RenameRenderer(id, name string) error {
 // ToggleRenderer toggles the enabled state of a renderer.
 func (db *DB) ToggleRenderer(id string) error {
 	_, err := db.conn.Exec(`UPDATE renderers SET enabled = NOT enabled WHERE id = ?`, id)
+	return err
+}
+
+// ToggleCastReceiver toggles the cast_enabled state of a renderer.
+func (db *DB) ToggleCastReceiver(id string) error {
+	_, err := db.conn.Exec(`UPDATE renderers SET cast_enabled = NOT cast_enabled WHERE id = ?`, id)
+	return err
+}
+
+// SetCastReceiver sets the cast_enabled state for a renderer.
+func (db *DB) SetCastReceiver(id string, enabled bool) error {
+	val := 0
+	if enabled {
+		val = 1
+	}
+	_, err := db.conn.Exec(`UPDATE renderers SET cast_enabled = ? WHERE id = ?`, val, id)
 	return err
 }
 

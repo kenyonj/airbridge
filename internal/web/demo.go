@@ -66,6 +66,19 @@ func (d *DemoController) GetTransportState(id string) string {
 	return states[idx%len(states)]
 }
 
+// EnableCastReceiver is a no-op in demo mode.
+func (d *DemoController) EnableCastReceiver(id string, port int) error {
+	return nil
+}
+
+// DisableCastReceiver is a no-op in demo mode.
+func (d *DemoController) DisableCastReceiver(id string) {}
+
+// IsCastReceiverEnabled returns mock cast status.
+func (d *DemoController) IsCastReceiverEnabled(id string) bool {
+	return false
+}
+
 // DemoDiscovery provides mock device discovery.
 type DemoDiscovery struct{}
 
@@ -213,6 +226,17 @@ func (d *DemoDB) ToggleRenderer(id string) error {
 	for i, r := range d.renderers {
 		if r.ID == id {
 			d.renderers[i].Enabled = !d.renderers[i].Enabled
+			return nil
+		}
+	}
+	return nil
+}
+
+// ToggleCastReceiver toggles the cast_enabled state of a renderer.
+func (d *DemoDB) ToggleCastReceiver(id string) error {
+	for i, r := range d.renderers {
+		if r.ID == id {
+			d.renderers[i].CastEnabled = !d.renderers[i].CastEnabled
 			return nil
 		}
 	}

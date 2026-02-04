@@ -41,6 +41,7 @@ type DBInterface interface {
 	DeleteRenderer(id string) error
 	GetNextPort(basePort int) (int, error)
 	ToggleRenderer(id string) error
+	ToggleCastReceiver(id string) error
 	RenameRenderer(id, name string) error
 }
 
@@ -82,6 +83,9 @@ type RendererController interface {
 	StopAll()
 	RestartAll()
 	GetTransportState(id string) string
+	EnableCastReceiver(id string, port int) error
+	DisableCastReceiver(id string)
+	IsCastReceiverEnabled(id string) bool
 }
 
 // NewServer creates a new web server.
@@ -278,6 +282,8 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case action == "toggle" && r.Method == "POST":
 		s.toggleRenderer(w, r, id)
+	case action == "toggle-cast" && r.Method == "POST":
+		s.toggleCastReceiver(w, r, id)
 	case action == "start" && r.Method == "POST":
 		s.startRenderer(w, r, id)
 	case action == "stop" && r.Method == "POST":
@@ -456,6 +462,28 @@ func (s *Server) toggleRenderer(w http.ResponseWriter, r *http.Request, id strin
 	}
 
 	log.Printf("Toggled renderer: %s", id)
+	s.listRenderers(w, r)
+}
+
+func (s *Server) toggleCastReceiver(w http.ResponseWriter, r *http.Request, id string) {
+	if err := s.db.ToggleCastReceiver(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get updated state and enable/disable cast advertisement
+	renderer, err := s.db.GetRenderer(id)
+	if err == nil && renderer != nil {
+		if renderer.CastEnabled {
+			if err := s.renderers.EnableCastReceiver(id, renderer.CastPort); err != nil {
+				log.Printf("Warning: failed to enable Cast receiver: %v", err)
+			}
+		} else {
+			s.renderers.DisableCastReceiver(id)
+		}
+	}
+
+	log.Printf("Toggled Cast receiver for: %s", id)
 	s.listRenderers(w, r)
 }
 

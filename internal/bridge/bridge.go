@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kenyonj/airbridge/internal/cast"
 	"github.com/kenyonj/airbridge/internal/database"
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/player"
@@ -50,8 +51,9 @@ type Bridge struct {
 	startTime time.Time
 	server    *http.Server
 
-	renderers map[string]*RendererInstance // keyed by renderer ID (UUID)
-	mu        sync.RWMutex
+	renderers      map[string]*RendererInstance // keyed by renderer ID (UUID)
+	castAdvertiser *cast.Advertiser             // Chromecast mDNS advertiser
+	mu             sync.RWMutex
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -63,10 +65,11 @@ type Bridge struct {
 // NewBridge creates a new unified bridge.
 func NewBridge(db *database.DB, disco *discovery.Service, port int) *Bridge {
 	return &Bridge{
-		db:        db,
-		disco:     disco,
-		port:      port,
-		renderers: make(map[string]*RendererInstance),
+		db:             db,
+		disco:          disco,
+		port:           port,
+		renderers:      make(map[string]*RendererInstance),
+		castAdvertiser: cast.NewAdvertiser(),
 	}
 }
 
@@ -114,6 +117,9 @@ func (b *Bridge) Stop() {
 		b.stopRenderer(r)
 	}
 
+	// Stop all Chromecast advertisements
+	b.castAdvertiser.StopAll()
+
 	// Shutdown HTTP server
 	if b.server != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -137,6 +143,12 @@ func (b *Bridge) loadRenderers() error {
 		if r.Enabled {
 			if err := b.addRenderer(&r); err != nil {
 				log.Printf("Failed to load renderer %s: %v", r.Name, err)
+			}
+			// Enable Chromecast receiver if configured
+			if r.CastEnabled {
+				if err := b.EnableCastReceiver(r.ID, r.CastPort); err != nil {
+					log.Printf("Failed to enable Cast receiver for %s: %v", r.Name, err)
+				}
 			}
 		}
 	}
@@ -336,7 +348,41 @@ func (b *Bridge) StopAll() {
 	}
 	b.renderers = make(map[string]*RendererInstance)
 
+	// Stop all Chromecast advertisements
+	b.castAdvertiser.StopAll()
+
 	log.Println("All renderers stopped")
+}
+
+// EnableCastReceiver enables Chromecast receiver advertisement for a renderer.
+// The port is the CASTV2 protocol port (typically 8009).
+func (b *Bridge) EnableCastReceiver(rendererID string, port int) error {
+	b.mu.RLock()
+	r, ok := b.renderers[rendererID]
+	b.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("renderer not found: %s", rendererID)
+	}
+
+	cfg := cast.DeviceConfig{
+		UUID:         rendererID,
+		FriendlyName: r.Name,
+		Model:        "Airbridge",
+		Port:         port,
+	}
+
+	return b.castAdvertiser.Advertise(cfg)
+}
+
+// DisableCastReceiver disables Chromecast receiver advertisement for a renderer.
+func (b *Bridge) DisableCastReceiver(rendererID string) {
+	b.castAdvertiser.Stop(rendererID)
+}
+
+// IsCastReceiverEnabled returns whether Chromecast receiver is enabled for a renderer.
+func (b *Bridge) IsCastReceiverEnabled(rendererID string) bool {
+	return b.castAdvertiser.IsAdvertising(rendererID)
 }
 
 // startHTTPServer starts the unified HTTP server.
