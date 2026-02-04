@@ -97,6 +97,12 @@ git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
 echo "Pushing tag to origin..."
 git push origin "$NEW_VERSION"
 
+# Create GitHub release
+echo "Creating GitHub release..."
+gh release create "$NEW_VERSION" \
+    --title "$NEW_VERSION" \
+    --generate-notes
+
 echo ""
 echo "✅ Released $NEW_VERSION"
 echo "   GitHub Actions will now build and push Docker images."
