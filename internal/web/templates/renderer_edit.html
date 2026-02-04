@@ -1,5 +1,5 @@
 <div class="p-4 bg-white rounded-lg border border-indigo-300 shadow-sm">
-    <form hx-post="/admin/renderers/{{.Renderer.ID}}/update" hx-target="#renderer-list" hx-swap="outerHTML">
+    <form hx-post="/admin/renderers/{{.Renderer.ID}}/update" hx-target="#renderer-section" hx-swap="outerHTML">
         <div class="space-y-4">
             <div class="flex items-center space-x-3">
                 <div class="w-3 h-3 rounded-full {{if .Renderer.Running}}bg-green-500 animate-pulse{{else if .Renderer.Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
@@ -74,7 +74,7 @@
                 <button 
                     type="button"
                     hx-get="/admin/renderers"
-                    hx-target="#renderer-list"
+                    hx-target="#renderer-section"
                     hx-swap="outerHTML"
                     class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
                     Cancel

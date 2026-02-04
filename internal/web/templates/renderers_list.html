@@ -9,6 +9,18 @@
     <div class="flex items-center justify-between p-4">
         <div class="flex items-center space-x-4">
             <div class="w-3 h-3 rounded-full {{if eq .TransportState "PLAYING"}}bg-blue-500 animate-pulse{{else if .Running}}bg-green-500{{else if .Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
+            {{if eq .DeviceType "chromecast"}}
+            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" title="Chromecast">
+                <path d="M3.29092 8C3.48057 6.81136 3.74029 5.97978 4.00001 5.77778C4.50001 5.38889 8.00001 5 12 5C16 5 19.5 5.38889 20 5.77778C20.5 6.16667 21 8.88889 21 12C21 15.1111 20.5 17.8333 20 18.2222C19.5857 18.5445 17.1116 18.8667 14 18.9677M3 11C5.03079 11.2259 6.92428 12.136 8.36911 13.5809C9.81395 15.0257 10.7241 16.9192 10.95 18.95M3 15.05C3.96089 15.246 4.84294 15.7202 5.53638 16.4136C6.22982 17.1071 6.70403 17.9891 6.9 18.95M3 18.95H3.01"/>
+            </svg>
+            {{else}}
+            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="AirPlay">
+                <path d="M12 16L18 21H6L12 16Z"/>
+                <path d="M3.99927 18C2.74389 16.3287 2 14.2512 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 14.2512 21.2561 16.3287 20.0007 18"/>
+                <path d="M17.1228 15.1252C17.6793 14.215 18 13.1449 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 13.144 6.32014 14.2131 6.87572 15.1228"/>
+                <path d="M14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12"/>
+            </svg>
+            {{end}}
             <div class="flex-1">
                 <div class="font-medium text-gray-800">{{.Name}}</div>
                 <div class="text-sm text-gray-500">→ {{.DeviceName}} (Port {{.Port}})</div>
@@ -48,43 +60,57 @@
                 hx-post="/admin/renderers/{{.ID}}/stop"
                 hx-target="#renderer-section"
                 hx-swap="outerHTML"
-                class="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200">
-                Stop
+                class="p-2 text-red-600 hover:bg-red-100 rounded"
+                title="Stop">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                </svg>
             </button>
             <button 
                 hx-post="/admin/renderers/{{.ID}}/restart"
                 hx-target="#renderer-section"
                 hx-swap="outerHTML"
-                class="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
-                Restart
+                class="p-2 text-blue-600 hover:bg-blue-100 rounded"
+                title="Restart">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
             </button>
             {{else if .Enabled}}
             <button 
                 hx-post="/admin/renderers/{{.ID}}/start"
                 hx-target="#renderer-section"
                 hx-swap="outerHTML"
-                class="px-3 py-1 text-sm bg-green-100 text-green-800 rounded hover:bg-green-200">
-                Start
-            </button>
-            {{end}}
-            <button 
-                hx-get="/admin/renderers/{{.ID}}/edit"
-                hx-target="closest div.bg-gray-50"
-                hx-swap="outerHTML"
-                class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded"
-                title="Settings">
+                class="p-2 text-green-600 hover:bg-green-100 rounded"
+                title="Start">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </button>
+            {{end}}
             <button 
                 hx-delete="/admin/renderers/{{.ID}}"
                 hx-target="#renderer-section"
                 hx-swap="outerHTML"
                 hx-confirm="Delete renderer '{{.Name}}'?"
-                class="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200">
-                Delete
+                class="p-2 text-red-600 hover:bg-red-100 rounded"
+                title="Delete">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+            </button>
+            <button 
+                hx-get="/admin/renderers/{{.ID}}/edit"
+                hx-target="#renderer-section"
+                hx-swap="innerHTML"
+                class="p-2 text-gray-500 hover:bg-gray-200 rounded"
+                title="Settings">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
             </button>
         </div>
     </div>
