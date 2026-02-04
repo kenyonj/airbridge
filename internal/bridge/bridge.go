@@ -530,6 +530,7 @@ func (b *Bridge) generateDeviceXML(baseURL string) string {
     <major>1</major>
     <minor>0</minor>
   </specVersion>
+  <URLBase>%s</URLBase>
   <device>
     <deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>
     <friendlyName>Airbridge</friendlyName>
@@ -541,7 +542,7 @@ func (b *Bridge) generateDeviceXML(baseURL string) string {
     <deviceList>%s
     </deviceList>
   </device>
-</root>`, rootUUID, embeddedDevices.String())
+</root>`, baseURL, rootUUID, embeddedDevices.String())
 }
 
 // handleRendererRequest routes requests to the appropriate renderer.
@@ -586,12 +587,14 @@ func (b *Bridge) handleRendererRequest(w http.ResponseWriter, r *http.Request) {
 
 // handleRendererDeviceXML returns a standalone device description for a single renderer.
 func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request, renderer *RendererInstance) {
+	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, b.port)
 	xml := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <root xmlns="urn:schemas-upnp-org:device-1-0">
   <specVersion>
     <major>1</major>
     <minor>0</minor>
   </specVersion>
+  <URLBase>%s</URLBase>
   <device>
     <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
     <friendlyName>%s</friendlyName>
@@ -624,7 +627,7 @@ func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request,
       </service>
     </serviceList>
   </device>
-</root>`, renderer.Name, renderer.AirPlayName, renderer.ID,
+</root>`, baseURL, renderer.Name, renderer.AirPlayName, renderer.ID,
 		renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID)
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")

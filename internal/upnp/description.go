@@ -10,6 +10,7 @@ func DeviceDescriptionXML(baseURL, deviceUUID, friendlyName, manufacturer string
     <major>1</major>
     <minor>0</minor>
   </specVersion>
+  <URLBase>%s</URLBase>
   <device>
     <deviceType>%s</deviceType>
     <friendlyName>%s</friendlyName>
@@ -43,7 +44,7 @@ func DeviceDescriptionXML(baseURL, deviceUUID, friendlyName, manufacturer string
     </serviceList>
   </device>
 </root>`,
-		DeviceType, friendlyName, manufacturer, deviceUUID,
+		baseURL, DeviceType, friendlyName, manufacturer, deviceUUID,
 		AVTransportType, RenderingType, ConnectionType)
 }
 
