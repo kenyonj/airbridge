@@ -18,7 +18,7 @@ import (
 
 // Version is the current Airbridge version, displayed in the web UI.
 // This can be overridden at build time with: go build -ldflags="-X github.com/kenyonj/airbridge/internal/web.Version=x.y.z"
-var Version = "0.1.4"
+var Version = "0.1.9"
 
 //go:embed templates/*.html
 var templateFS embed.FS

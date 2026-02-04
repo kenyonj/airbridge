@@ -82,7 +82,7 @@ sed -i '' "s/Version: [0-9]*\.[0-9]*\.[0-9]*/Version: ${VERSION_NUM}/" cmd/airbr
 sed -i '' "s/^version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"${VERSION_NUM}\"/" airbridge/config.yaml
 
 # Update internal/web/server.go (web UI version)
-sed -i '' "s/const Version = \"[0-9]*\.[0-9]*\.[0-9]*\"/const Version = \"${VERSION_NUM}\"/" internal/web/server.go
+sed -i '' "s/var Version = \"[0-9]*\.[0-9]*\.[0-9]*\"/var Version = \"${VERSION_NUM}\"/" internal/web/server.go
 
 # Commit version bump
 echo "Committing version bump..."
