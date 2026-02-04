@@ -53,6 +53,7 @@ type Bridge struct {
 
 	renderers      map[string]*RendererInstance // keyed by renderer ID (UUID)
 	castAdvertiser *cast.Advertiser             // Chromecast mDNS advertiser
+	castServers    map[string]*cast.Server      // CASTV2 servers per renderer
 	mu             sync.RWMutex
 
 	ctx    context.Context
@@ -70,6 +71,7 @@ func NewBridge(db *database.DB, disco *discovery.Service, port int) *Bridge {
 		port:           port,
 		renderers:      make(map[string]*RendererInstance),
 		castAdvertiser: cast.NewAdvertiser(),
+		castServers:    make(map[string]*cast.Server),
 	}
 }
 
@@ -357,14 +359,40 @@ func (b *Bridge) StopAll() {
 // EnableCastReceiver enables Chromecast receiver advertisement for a renderer.
 // The port is the CASTV2 protocol port (typically 8009).
 func (b *Bridge) EnableCastReceiver(rendererID string, port int) error {
-	b.mu.RLock()
+	b.mu.Lock()
 	r, ok := b.renderers[rendererID]
-	b.mu.RUnlock()
-
 	if !ok {
+		b.mu.Unlock()
 		return fmt.Errorf("renderer not found: %s", rendererID)
 	}
 
+	// Stop existing server if any
+	if srv, exists := b.castServers[rendererID]; exists {
+		srv.Stop()
+		delete(b.castServers, rendererID)
+	}
+
+	// Create and start CASTV2 server
+	srv := cast.NewServer(port, r.Name, rendererID)
+	srv.OnMediaLoad = func(url, contentType string) {
+		log.Printf("Cast media load: %s (%s)", url, contentType)
+		if r.Player != nil {
+			ctx := context.Background()
+			volume := r.State.GetVolume()
+			if err := r.Player.Play(ctx, url, volume); err != nil {
+				log.Printf("Cast Play error: %v", err)
+			}
+		}
+	}
+
+	if err := srv.Start(); err != nil {
+		b.mu.Unlock()
+		return fmt.Errorf("start cast server: %w", err)
+	}
+	b.castServers[rendererID] = srv
+	b.mu.Unlock()
+
+	// Advertise via mDNS
 	cfg := cast.DeviceConfig{
 		UUID:         rendererID,
 		FriendlyName: r.Name,
@@ -378,6 +406,13 @@ func (b *Bridge) EnableCastReceiver(rendererID string, port int) error {
 // DisableCastReceiver disables Chromecast receiver advertisement for a renderer.
 func (b *Bridge) DisableCastReceiver(rendererID string) {
 	b.castAdvertiser.Stop(rendererID)
+
+	b.mu.Lock()
+	if srv, exists := b.castServers[rendererID]; exists {
+		srv.Stop()
+		delete(b.castServers, rendererID)
+	}
+	b.mu.Unlock()
 }
 
 // IsCastReceiverEnabled returns whether Chromecast receiver is enabled for a renderer.
