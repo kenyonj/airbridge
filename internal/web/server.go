@@ -50,6 +50,9 @@ type DiscoveryInterface interface {
 	GetChromecasts() []*discovery.ChromecastDevice
 	GetDevice(deviceID string) *discovery.AirPlayDevice
 	GetChromecast(deviceID string) *discovery.ChromecastDevice
+	// Unified device methods
+	GetAllDevices() []*discovery.Device
+	GetDeviceUnified(deviceID string) *discovery.Device
 }
 
 // DeviceInfo represents a device (AirPlay or Chromecast) for the UI.
@@ -174,15 +177,14 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"RunningCount": s.renderers.RunningCount(),
 		"TotalCount":   len(renderers),
 		"PlayingCount": playingCount,
-		"DeviceCount":  len(s.disco.GetDevices()) + len(s.disco.GetChromecasts()),
+		"DeviceCount":  len(s.disco.GetAllDevices()),
 	}
 
 	s.render(w, "layout.html", data)
 }
 
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
-	airplayDevices := s.disco.GetDevices()
-	chromecastDevices := s.disco.GetChromecasts()
+	allDevices := s.disco.GetAllDevices()
 	renderers, _ := s.db.ListRenderers()
 
 	// Get filter from query params
@@ -201,45 +203,22 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	// Collect unique models for filter dropdown
 	modelSet := make(map[string]bool)
 
-	// Convert AirPlay devices to DeviceInfo
+	// Convert devices to DeviceInfo
 	var deviceInfos []DeviceInfo
-	for _, d := range airplayDevices {
+	for _, d := range allDevices {
 		modelSet[d.Model] = true
 
 		// Apply filters
 		if filterModel != "" && d.Model != filterModel {
 			continue
 		}
-		if filterType != "" && filterType != "airplay" {
+		if filterType != "" && string(d.DeviceType) != filterType {
 			continue
 		}
 
 		deviceInfos = append(deviceInfos, DeviceInfo{
 			DeviceID:   d.DeviceID,
-			DeviceType: "airplay",
-			Name:       d.Name,
-			Host:       d.Host,
-			Port:       d.Port,
-			Model:      d.Model,
-			Configured: configuredIDs[d.DeviceID],
-		})
-	}
-
-	// Convert Chromecast devices to DeviceInfo
-	for _, d := range chromecastDevices {
-		modelSet[d.Model] = true
-
-		// Apply filters
-		if filterModel != "" && d.Model != filterModel {
-			continue
-		}
-		if filterType != "" && filterType != "chromecast" {
-			continue
-		}
-
-		deviceInfos = append(deviceInfos, DeviceInfo{
-			DeviceID:   d.DeviceID,
-			DeviceType: "chromecast",
+			DeviceType: string(d.DeviceType),
 			Name:       d.Name,
 			Host:       d.Host,
 			Port:       d.Port,
@@ -599,7 +578,7 @@ func (s *Server) handleServerStatus(w http.ResponseWriter, r *http.Request) {
 		"RunningCount": s.renderers.RunningCount(),
 		"TotalCount":   len(renderers),
 		"PlayingCount": playingCount,
-		"DeviceCount":  len(s.disco.GetDevices()) + len(s.disco.GetChromecasts()),
+		"DeviceCount":  len(s.disco.GetAllDevices()),
 	}
 
 	s.renderPartial(w, "server_status.html", data)

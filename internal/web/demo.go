@@ -114,6 +114,29 @@ func (d *DemoDiscovery) GetChromecast(deviceID string) *discovery.ChromecastDevi
 	return nil
 }
 
+// GetAllDevices returns all mock devices as unified Device types.
+func (d *DemoDiscovery) GetAllDevices() []*discovery.Device {
+	var devices []*discovery.Device
+	for _, dev := range d.GetDevices() {
+		devices = append(devices, dev.ToDevice())
+	}
+	for _, dev := range d.GetChromecasts() {
+		devices = append(devices, dev.ToDevice())
+	}
+	return devices
+}
+
+// GetDeviceUnified returns a mock device by ID.
+func (d *DemoDiscovery) GetDeviceUnified(deviceID string) *discovery.Device {
+	if dev := d.GetDevice(deviceID); dev != nil {
+		return dev.ToDevice()
+	}
+	if dev := d.GetChromecast(deviceID); dev != nil {
+		return dev.ToDevice()
+	}
+	return nil
+}
+
 // DemoDB provides mock database operations.
 type DemoDB struct {
 	renderers []database.Renderer

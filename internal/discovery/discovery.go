@@ -186,6 +186,53 @@ func (s *Service) GetChromecastByName(name string) *ChromecastDevice {
 	return nil
 }
 
+// GetAllDevices returns all discovered devices (AirPlay and Chromecast) as unified Device types.
+func (s *Service) GetAllDevices() []*Device {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	devices := make([]*Device, 0, len(s.devices)+len(s.chromecasts))
+	for _, d := range s.devices {
+		devices = append(devices, d.ToDevice())
+	}
+	for _, d := range s.chromecasts {
+		devices = append(devices, d.ToDevice())
+	}
+	return devices
+}
+
+// GetDeviceUnified returns a device by its ID, checking both AirPlay and Chromecast.
+func (s *Service) GetDeviceUnified(id string) *Device {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if d, ok := s.devices[id]; ok {
+		return d.ToDevice()
+	}
+	if d, ok := s.chromecasts[id]; ok {
+		return d.ToDevice()
+	}
+	return nil
+}
+
+// GetDeviceByNameUnified returns a device by its friendly name, checking both types.
+func (s *Service) GetDeviceByNameUnified(name string) *Device {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, d := range s.devices {
+		if strings.EqualFold(d.Name, name) {
+			return d.ToDevice()
+		}
+	}
+	for _, d := range s.chromecasts {
+		if strings.EqualFold(d.Name, name) {
+			return d.ToDevice()
+		}
+	}
+	return nil
+}
+
 // parseRAOPEntry parses a zeroconf entry into an AirPlayDevice.
 func (s *Service) parseRAOPEntry(entry *zeroconf.ServiceEntry) *AirPlayDevice {
 	// RAOP instance names are formatted as "DEVICEID@FriendlyName"
