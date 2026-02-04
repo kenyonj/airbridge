@@ -12,6 +12,11 @@ GOMOD=$(GOCMD) mod
 BINARY_NAME=airbridge
 BINARY_PATH=bin/$(BINARY_NAME)
 
+# Version from git tags
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION_PKG=github.com/kenyonj/airbridge/internal/web
+LDFLAGS=-ldflags="-X $(VERSION_PKG).Version=$(VERSION)"
+
 # Build directories
 BUILD_DIR=bin
 
@@ -19,7 +24,7 @@ all: build
 
 build:
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -o $(BINARY_PATH) ./cmd/airbridge
+	$(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/airbridge
 
 run:
 	$(GORUN) ./cmd/airbridge

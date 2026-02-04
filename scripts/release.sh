@@ -71,7 +71,7 @@ NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
 VERSION_NUM="${MAJOR}.${MINOR}.${PATCH}"
 echo "New version: $NEW_VERSION"
 
-# Update version in source files
+# Update version in source files (only files that need hardcoded versions)
 echo ""
 echo "Updating version in source files..."
 
@@ -81,13 +81,12 @@ sed -i '' "s/Version: [0-9]*\.[0-9]*\.[0-9]*/Version: ${VERSION_NUM}/" cmd/airbr
 # Update airbridge/config.yaml
 sed -i '' "s/^version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"${VERSION_NUM}\"/" airbridge/config.yaml
 
-# Update internal/web/server.go (web UI version)
-sed -i '' "s/var Version = \"[0-9]*\.[0-9]*\.[0-9]*\"/var Version = \"${VERSION_NUM}\"/" internal/web/server.go
+# Note: internal/web/server.go version is injected at build time via ldflags from git tags
 
 # Commit version bump
 echo "Committing version bump..."
-git add cmd/airbridge/main.go airbridge/config.yaml internal/web/server.go
-git commit -m "Bump version to ${NEW_VERSION}"
+git add cmd/airbridge/main.go airbridge/config.yaml
+git commit -m "Bump version to ${NEW_VERSION}" || echo "No changes to commit"
 git push origin main
 
 # Create and push tag
