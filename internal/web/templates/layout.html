@@ -133,13 +133,18 @@
                 };
             }
 
+            var refreshTimeout = null;
             function updateRendererState(rendererId, transportState, running) {
-                // Find renderer elements and update their state indicators
-                var rendererList = document.getElementById('renderer-list');
-                if (!rendererList) return;
-
-                // Trigger HTMX refresh to get updated state
-                htmx.trigger(rendererList, 'refresh');
+                // Debounce rapid state updates (STOPPED → TRANSITIONING → PLAYING)
+                if (refreshTimeout) {
+                    clearTimeout(refreshTimeout);
+                }
+                
+                refreshTimeout = setTimeout(function() {
+                    var rendererSection = document.getElementById('renderer-section');
+                    if (!rendererSection) return;
+                    htmx.trigger(rendererSection, 'refresh');
+                }, 100);
             }
 
             function handleRendererChange(rendererId, action) {

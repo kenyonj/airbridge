@@ -422,23 +422,25 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 	fmt.Println("Discovering AirPlay devices...")
 	time.Sleep(3 * time.Second)
 
-	// Create and start unified bridge (DLNA server with embedded devices)
+	// Create unified bridge (DLNA server with embedded devices)
 	br := bridge.NewBridge(db, disco, httpPort+1)
-	if err := br.Start(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to start bridge: %v\n", err)
-		os.Exit(1)
-	}
 	defer br.Stop()
 
-	// Create web server
+	// Create web server first so we can wire up state broadcasting
 	webServer, err := web.NewServer(db, disco, br, httpPort+1)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create web server: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Wire up state broadcasting from bridge to web clients
+	// Wire up state broadcasting from bridge to web clients BEFORE starting bridge
 	br.SetStateBroadcaster(webServer.BroadcastStateUpdate)
+
+	// Now start the bridge (which loads renderers with callbacks set)
+	if err := br.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start bridge: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Setup HTTP server for web admin
 	mux := http.NewServeMux()

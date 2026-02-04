@@ -72,13 +72,13 @@ func AVTransportHandler(st *state.PlayerState, player Player, em *EventManager) 
 				WriteSOAPError(w, 712, "Session in use")
 				return
 			}
-			// Update state synchronously so GetTransportInfo returns correct state
+			// Update state and notify immediately (before async player operation)
 			st.SetTransportState(state.StatePaused)
+			em.NotifyTransportState(string(state.StatePaused))
 			go func() {
 				if err := player.Pause(ctx); err != nil {
 					log.Printf("Pause error: %v", err)
 				}
-				em.NotifyTransportState(string(state.StatePaused))
 			}()
 			WriteSOAPResponse(w, AVTransportType, "PauseResponse", "")
 
@@ -87,13 +87,13 @@ func AVTransportHandler(st *state.PlayerState, player Player, em *EventManager) 
 				WriteSOAPError(w, 712, "Session in use")
 				return
 			}
-			// Update state synchronously so GetTransportInfo returns correct state
+			// Update state and notify immediately (before async player operation)
 			st.SetTransportState(state.StateStopped)
+			em.NotifyTransportState(string(state.StateStopped))
 			go func() {
 				if err := player.Stop(ctx); err != nil {
 					log.Printf("Stop error: %v", err)
 				}
-				em.NotifyTransportState(string(state.StateStopped))
 				st.ReleaseSession()
 			}()
 			WriteSOAPResponse(w, AVTransportType, "StopResponse", "")
