@@ -93,12 +93,12 @@
             hx-post="/admin/renderers/{{.ID}}/toggle-cast"
             hx-target="#renderer-section"
             hx-swap="outerHTML"
-            class="px-3 py-1 text-sm rounded flex items-center space-x-1 {{if .CastEnabled}}bg-purple-100 text-purple-800 hover:bg-purple-200{{else}}bg-gray-100 text-gray-600 hover:bg-gray-200{{end}}"
-            title="{{if .CastEnabled}}Disable Chromecast receiver{{else}}Enable Chromecast receiver{{end}}">
+            class="px-3 py-1 text-sm rounded flex items-center space-x-1 {{if .CastEnabled}}bg-orange-100 text-orange-800 hover:bg-orange-200{{else}}bg-gray-100 text-gray-600 hover:bg-gray-200{{end}}"
+            title="Experimental: Cast receiver (may not work with all apps)">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 10V7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7V17C20 17.5523 19.5523 18 19 18H12M6 18C6 16.8954 5.10457 16 4 16M8 18C8 15.7909 6.20914 14 4 14M4 12C7.31371 12 10 14.6863 10 18"/>
             </svg>
-            <span>{{if .CastEnabled}}Cast Enabled{{else}}Enable Cast{{end}}</span>
+            <span>{{if .CastEnabled}}Cast (Experimental){{else}}Cast (Experimental){{end}}</span>
         </button>
     </div>
 </div>
