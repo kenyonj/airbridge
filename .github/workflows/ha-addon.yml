@@ -41,6 +41,15 @@ jobs:
           VERSION=$(grep '^version:' airbridge/config.yaml | sed 's/version: *"\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Get git version
+        id: gitversion
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -52,6 +61,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/airbridge-ha-${{ matrix.arch }}:latest
           build-args: |
             BUILD_FROM=ghcr.io/hassio-addons/base:16.0.1
+            VERSION=${{ steps.gitversion.outputs.version }}
           platforms: linux/${{ matrix.arch }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
