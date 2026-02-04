@@ -14,18 +14,23 @@
   <Overview>
     Airbridge - Anything → Everywhere
     
-    Bridge DLNA/UPnP audio streams to AirPlay speakers. Use the web admin UI to discover AirPlay devices on your network and create virtual DLNA renderers that forward audio to them.
+    Bridge DLNA/UPnP audio streams to AirPlay speakers and Chromecast devices. Create virtual DLNA renderers that forward audio to your smart speakers.
     
-    Perfect for streaming from Music Assistant, Plex, Roon, or any DLNA-compatible media server to AirPlay-only speakers like HomePods, Sonos, or Apple TVs.
+    Perfect for streaming from Music Assistant, Plex, Roon, or any DLNA-compatible media server to:
+    • AirPlay devices (HomePods, Sonos, Apple TV, Juke Audio)
+    • Chromecast devices (Google Nest, Chromecast Audio)
     
     Features:
-    - Web-based admin interface for easy setup
-    - Auto-discovery of AirPlay devices
-    - Create and manage multiple bridges
-    - Persistent configuration
-    - Experimental Chromecast receiver support
+    • Web-based admin interface with real-time status
+    • Auto-discovery of AirPlay and Chromecast devices
+    • Create and manage multiple bridges
+    • Live playback status via WebSocket
+    • Volume control support
+    • Persistent configuration
     
-    Requires host network mode for device discovery.
+    IMPORTANT: Set AIRBRIDGE_PORT if you need a port other than 8200.
+    
+    Requires host network mode for mDNS device discovery.
   </Overview>
   <Category>MediaServer:Music</Category>
   <WebUI>http://[IP]:[PORT:AIRBRIDGE_PORT]/admin</WebUI>
