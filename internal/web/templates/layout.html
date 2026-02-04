@@ -110,6 +110,8 @@
                     var data = JSON.parse(event.data);
                     if (data.type === 'state_update') {
                         updateRendererState(data.renderer_id, data.transport_state, data.running);
+                    } else if (data.type === 'renderer_changed') {
+                        handleRendererChange(data.renderer_id, data.action);
                     }
                 };
 
@@ -132,6 +134,26 @@
 
                 // Trigger HTMX refresh to get updated state
                 htmx.trigger(rendererList, 'refresh');
+            }
+
+            function handleRendererChange(rendererId, action) {
+                // Refresh renderer section (includes count)
+                var rendererSection = document.getElementById('renderer-section');
+                if (rendererSection) {
+                    htmx.trigger(rendererSection, 'refresh');
+                }
+
+                // Refresh available devices list (to update configured status)
+                var deviceList = document.getElementById('device-list');
+                if (deviceList) {
+                    htmx.trigger(deviceList, 'refresh');
+                }
+
+                // Refresh server status (to update counts)
+                var serverStatus = document.getElementById('server-status');
+                if (serverStatus) {
+                    htmx.trigger(serverStatus, 'refresh');
+                }
             }
 
             // Start connection when page loads

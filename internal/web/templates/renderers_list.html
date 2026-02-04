@@ -1,4 +1,9 @@
-<div class="space-y-3" id="renderer-list" hx-get="/admin/renderers" hx-trigger="refresh from:body" hx-swap="outerHTML">
+<div id="renderer-section" hx-get="/admin/renderers" hx-trigger="refresh from:body" hx-swap="outerHTML">
+<div class="flex justify-between items-center mb-4">
+    <h2 class="text-lg font-semibold text-gray-800">Configured Renderers</h2>
+    <span class="text-sm text-gray-500">{{len .Renderers}} renderer(s)</span>
+</div>
+<div class="space-y-3" id="renderer-list">
 {{range .Renderers}}
 <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border {{if eq .TransportState "PLAYING"}}border-blue-300{{else if .Running}}border-green-300{{else if .Enabled}}border-yellow-200{{else}}border-gray-200{{end}}">
     <div class="flex items-center space-x-4">
@@ -18,7 +23,7 @@
             </div>
             {{if .DLNAURL}}
             <div class="mt-2 flex items-center space-x-2">
-                <code class="text-xs bg-gray-200 px-2 py-1 rounded font-mono text-gray-700 dlna-url">{{.DLNAURL}}</code>
+                <code class="text-xs bg-gray-200 px-2 py-1 rounded font-mono text-gray-700 cursor-help" title="{{.DLNAURL}}">{{.ID}}</code>
                 <button 
                     type="button"
                     onclick="copyToClipboard(this, '{{.DLNAURL}}')"
@@ -29,7 +34,7 @@
                     <svg class="h-3 w-3 check-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
-                    <span class="copy-text">Copy URL</span>
+                    <span class="copy-text">Copy Full URL</span>
                 </button>
             </div>
             {{end}}
@@ -39,14 +44,14 @@
         {{if .Running}}
         <button 
             hx-post="/admin/renderers/{{.ID}}/stop"
-            hx-target="#renderer-list"
+            hx-target="#renderer-section"
             hx-swap="outerHTML"
             class="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200">
             Stop
         </button>
         <button 
             hx-post="/admin/renderers/{{.ID}}/restart"
-            hx-target="#renderer-list"
+            hx-target="#renderer-section"
             hx-swap="outerHTML"
             class="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
             Restart
@@ -54,7 +59,7 @@
         {{else if .Enabled}}
         <button 
             hx-post="/admin/renderers/{{.ID}}/start"
-            hx-target="#renderer-list"
+            hx-target="#renderer-section"
             hx-swap="outerHTML"
             class="px-3 py-1 text-sm bg-green-100 text-green-800 rounded hover:bg-green-200">
             Start
@@ -62,14 +67,14 @@
         {{end}}
         <button 
             hx-post="/admin/renderers/{{.ID}}/toggle"
-            hx-target="#renderer-list"
+            hx-target="#renderer-section"
             hx-swap="outerHTML"
             class="px-3 py-1 text-sm rounded {{if .Enabled}}bg-yellow-100 text-yellow-800 hover:bg-yellow-200{{else}}bg-green-100 text-green-800 hover:bg-green-200{{end}}">
             {{if .Enabled}}Disable{{else}}Enable{{end}}
         </button>
         <button 
             hx-delete="/admin/renderers/{{.ID}}"
-            hx-target="#renderer-list"
+            hx-target="#renderer-section"
             hx-swap="outerHTML"
             hx-confirm="Delete renderer '{{.Name}}'?"
             class="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200">
@@ -83,4 +88,5 @@
     <p class="text-sm">Click "New Renderer" above to create one.</p>
 </div>
 {{end}}
+</div>
 </div>

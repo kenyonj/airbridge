@@ -125,6 +125,15 @@ func (s *Server) BroadcastStateUpdate(rendererID, transportState string, running
 	})
 }
 
+// BroadcastRendererChange notifies clients that a renderer was created/deleted/updated.
+func (s *Server) BroadcastRendererChange(rendererID, action string) {
+	s.hub.Broadcast(WebSocketMessage{
+		Type:       "renderer_changed",
+		RendererID: rendererID,
+		Action:     action,
+	})
+}
+
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	renderers, err := s.db.ListRenderers()
 	if err != nil {
@@ -430,6 +439,9 @@ func (s *Server) createRenderer(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Created %s renderer: %s -> %s on port %d", deviceType, renderer.Name, deviceName, renderer.Port)
 
+	// Notify WebSocket clients of the change
+	s.BroadcastRendererChange(renderer.ID, "created")
+
 	// Start the renderer
 	if err := s.renderers.StartRenderer(renderer.ID); err != nil {
 		log.Printf("Warning: failed to start renderer: %v", err)
@@ -497,6 +509,10 @@ func (s *Server) deleteRenderer(w http.ResponseWriter, r *http.Request, id strin
 	}
 
 	log.Printf("Deleted renderer: %s", id)
+
+	// Notify WebSocket clients of the change
+	s.BroadcastRendererChange(id, "deleted")
+
 	s.listRenderers(w, r)
 }
 

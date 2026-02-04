@@ -15,18 +15,22 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// StateUpdate represents a renderer state change sent over WebSocket.
-type StateUpdate struct {
-	Type           string `json:"type"` // "state_update"
-	RendererID     string `json:"renderer_id"`
-	TransportState string `json:"transport_state"`
-	Running        bool   `json:"running"`
+// WebSocketMessage represents a message sent over WebSocket.
+type WebSocketMessage struct {
+	Type           string `json:"type"` // "state_update", "renderer_changed", etc.
+	RendererID     string `json:"renderer_id,omitempty"`
+	TransportState string `json:"transport_state,omitempty"`
+	Running        bool   `json:"running,omitempty"`
+	Action         string `json:"action,omitempty"` // "created", "deleted", "updated"
 }
 
-// Hub maintains active WebSocket connections and broadcasts state updates.
+// StateUpdate is an alias for backward compatibility.
+type StateUpdate = WebSocketMessage
+
+// Hub maintains active WebSocket connections and broadcasts updates.
 type Hub struct {
 	clients    map[*websocket.Conn]bool
-	broadcast  chan StateUpdate
+	broadcast  chan WebSocketMessage
 	register   chan *websocket.Conn
 	unregister chan *websocket.Conn
 	mu         sync.RWMutex
@@ -36,7 +40,7 @@ type Hub struct {
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[*websocket.Conn]bool),
-		broadcast:  make(chan StateUpdate, 256),
+		broadcast:  make(chan WebSocketMessage, 256),
 		register:   make(chan *websocket.Conn),
 		unregister: make(chan *websocket.Conn),
 	}
