@@ -1,4 +1,4 @@
-<div id="server-status" class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+<div id="server-status" hx-get="/admin/server/status" hx-trigger="refresh from:body" hx-swap="outerHTML" class="grid grid-cols-3 gap-4 text-center">
     <div>
         <div class="text-2xl font-bold text-indigo-600">{{.RunningCount}}/{{.TotalCount}}</div>
         <div class="text-xs text-gray-500">Renderers Running</div>
@@ -10,19 +10,5 @@
     <div>
         <div class="text-2xl font-bold text-gray-700">{{.Uptime}}</div>
         <div class="text-xs text-gray-500">Uptime</div>
-    </div>
-    <div>
-        <div class="text-sm font-mono text-gray-700">{{.LocalIP}}</div>
-        <div class="text-xs text-gray-500">Server IP</div>
-    </div>
-    <div>
-        <button 
-            hx-post="/admin/server/restart"
-            hx-target="#server-status"
-            hx-swap="outerHTML"
-            hx-confirm="Restart all renderers?"
-            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-            Restart All
-        </button>
     </div>
 </div>
