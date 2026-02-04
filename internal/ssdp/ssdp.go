@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -37,11 +38,25 @@ func Announce(ctx context.Context, baseURL, deviceUUID, serverName string) {
 
 // AnnounceWithLocation sends SSDP NOTIFY messages with a custom location path.
 func AnnounceWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID, serverName string) {
+	// Extract local IP from baseURL to bind to correct interface
+	var localIP net.IP
+	if parsed, err := url.Parse(baseURL); err == nil {
+		host := parsed.Hostname()
+		localIP = net.ParseIP(host)
+	}
+
 	addr, err := net.ResolveUDPAddr("udp4", ssdpAddr)
 	if err != nil {
 		return
 	}
-	conn, err := net.DialUDP("udp4", nil, addr)
+
+	// Bind to local IP to ensure multicast goes out on correct interface
+	var localAddr *net.UDPAddr
+	if localIP != nil {
+		localAddr = &net.UDPAddr{IP: localIP, Port: 0}
+	}
+
+	conn, err := net.DialUDP("udp4", localAddr, addr)
 	if err != nil {
 		return
 	}
@@ -112,11 +127,20 @@ func SearchResponder(ctx context.Context, baseURL, deviceUUID, serverName string
 
 // SearchResponderWithLocation listens for M-SEARCH requests and responds with a custom location.
 func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, deviceUUID, serverName string) {
+	// Extract local IP from baseURL to find the right interface
+	var iface *net.Interface
+	if parsed, err := url.Parse(baseURL); err == nil {
+		host := parsed.Hostname()
+		if localIP := net.ParseIP(host); localIP != nil {
+			iface = findInterfaceByIP(localIP)
+		}
+	}
+
 	addr, err := net.ResolveUDPAddr("udp4", ssdpAddr)
 	if err != nil {
 		return
 	}
-	conn, err := net.ListenMulticastUDP("udp4", nil, addr)
+	conn, err := net.ListenMulticastUDP("udp4", iface, addr)
 	if err != nil {
 		return
 	}
@@ -197,4 +221,31 @@ func headerValue(raw, key string) string {
 		}
 	}
 	return ""
+}
+
+// findInterfaceByIP finds the network interface that has the given IP address.
+func findInterfaceByIP(ip net.IP) *net.Interface {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ifaceIP net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ifaceIP = v.IP
+			case *net.IPAddr:
+				ifaceIP = v.IP
+			}
+			if ifaceIP != nil && ifaceIP.Equal(ip) {
+				return &iface
+			}
+		}
+	}
+	return nil
 }

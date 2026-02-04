@@ -37,6 +37,7 @@ type RendererInstance struct {
 	Player       upnp.Player // Generic player interface
 	EventManager *upnp.EventManager
 	cancel       context.CancelFunc
+	ssdpCancel   context.CancelFunc // Cancels SSDP announcements for this renderer
 }
 
 // StateBroadcaster is called when renderer state changes.
@@ -102,9 +103,6 @@ func (b *Bridge) Start(ctx context.Context) error {
 	if err := b.startHTTPServer(); err != nil {
 		return fmt.Errorf("start HTTP server: %w", err)
 	}
-
-	// Start SSDP announcements
-	b.startSSDP()
 
 	return nil
 }
@@ -222,7 +220,26 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 	}
 
 	b.renderers[r.ID] = inst
+
+	// Start SSDP announcements for this renderer
+	b.startRendererSSDP(inst)
+
 	return nil
+}
+
+// startRendererSSDP starts SSDP announcements for a specific renderer.
+func (b *Bridge) startRendererSSDP(r *RendererInstance) {
+	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, b.port)
+	serverName := "Airbridge/1.0"
+	uuid := "uuid:" + r.ID
+	locationPath := fmt.Sprintf("/renderer/%s/device.xml", r.ID)
+
+	ssdpCtx, ssdpCancel := context.WithCancel(b.ctx)
+	r.ssdpCancel = ssdpCancel
+
+	go ssdp.AnnounceWithLocation(ssdpCtx, baseURL, locationPath, uuid, serverName)
+	go ssdp.SearchResponderWithLocation(ssdpCtx, baseURL, locationPath, uuid, serverName)
+	log.Printf("Started SSDP announcements for renderer: %s", r.Name)
 }
 
 // RemoveRenderer removes a renderer instance.
@@ -239,6 +256,11 @@ func (b *Bridge) RemoveRenderer(id string) {
 
 // stopRenderer stops a single renderer.
 func (b *Bridge) stopRenderer(r *RendererInstance) {
+	// Stop SSDP announcements first
+	if r.ssdpCancel != nil {
+		r.ssdpCancel()
+		log.Printf("Stopped SSDP announcements for renderer: %s", r.Name)
+	}
 	if r.cancel != nil {
 		r.cancel()
 	}
@@ -655,22 +677,6 @@ func (b *Bridge) handleControl(w http.ResponseWriter, r *http.Request, renderer 
 // handleEvent handles UPnP event subscriptions.
 func (b *Bridge) handleEvent(w http.ResponseWriter, r *http.Request, renderer *RendererInstance, service string) {
 	upnp.EventHandlerWithState(renderer.EventManager, service, renderer.State)(w, r)
-}
-
-// startSSDP starts SSDP announcements for each renderer as standalone devices.
-func (b *Bridge) startSSDP() {
-	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, b.port)
-	serverName := "Airbridge/1.0"
-
-	// Announce each renderer as a standalone device with its own device.xml
-	b.mu.RLock()
-	for _, r := range b.renderers {
-		uuid := "uuid:" + r.ID
-		locationPath := fmt.Sprintf("/renderer/%s/device.xml", r.ID)
-		go ssdp.AnnounceWithLocation(b.ctx, baseURL, locationPath, uuid, serverName)
-		go ssdp.SearchResponderWithLocation(b.ctx, baseURL, locationPath, uuid, serverName)
-	}
-	b.mu.RUnlock()
 }
 
 func logMiddleware(next http.Handler) http.Handler {
