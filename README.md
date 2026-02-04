@@ -74,9 +74,9 @@ make build
 
 #### 3. Run
 
-**Bridge all discovered AirPlay devices:**
+**Web admin interface (recommended):**
 ```bash
-./bin/airbridge --serve-all
+./bin/airbridge --web
 ```
 
 **Bridge a single device:**
@@ -93,16 +93,12 @@ make build
 
 ```
 Usage of ./bin/airbridge:
-  -config string
-      Path to config file
   -db string
       Path to SQLite database (default "./airbridge.db")
   -port int
       HTTP port for DLNA server (default 8200)
   -serve
       Run as DLNA renderer server (single device)
-  -serve-all
-      Run as DLNA renderer server (all devices)
   -target string
       Target AirPlay device name (for serve mode)
   -test string
@@ -175,7 +171,7 @@ devices:
 
 ## Use with Music Assistant
 
-1. Start airbridge: `./bin/airbridge --serve-all` or `./bin/airbridge --web`
+1. Start airbridge: `./bin/airbridge --web`
 2. In Music Assistant, go to Settings → Players
 3. You should see "Airbridge (Device Name)" devices appear as DLNA players
 4. Select a device and start playing music!
@@ -198,9 +194,6 @@ The web admin (`--web` mode) provides a modern UI for managing renderers:
 ```bash
 # Run with web admin interface
 docker run -d --network=host -v airbridge-data:/data ghcr.io/kenyonj/airbridge:latest
-
-# Or run in serve-all mode (no web UI)
-docker run -d --network=host ghcr.io/kenyonj/airbridge:latest --serve-all
 ```
 
 **Note:** Host network mode is required for mDNS device discovery and SSDP announcements.
@@ -248,7 +241,6 @@ The easiest way to run Airbridge locally is with the dev script, which rebuilds 
 
 ```bash
 ./scripts/dev.sh --web        # Web admin interface (recommended)
-./scripts/dev.sh --serve-all  # All discovered devices
 ./scripts/dev.sh --serve "Device Name"  # Single device
 ```
 

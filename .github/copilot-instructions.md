@@ -22,9 +22,9 @@ Media servers (Music Assistant, Plex) → DLNA/UPnP → Airbridge → AirPlay sp
 
 ### Key Components
 
-- **`cmd/airbridge/main.go`** - Entry point with three modes: `--serve` (single device), `--serve-all` (multi-device), `--web` (admin UI)
+- **`cmd/airbridge/main.go`** - Entry point with two modes: `--serve` (single device), `--web` (admin UI)
 - **`internal/bridge/`** - Unified DLNA bridge with embedded renderers for web mode; manages HTTP server with `/device.xml` root and `/renderer/{uuid}/` routes
-- **`internal/renderer/`** - Manager for multi-device mode (`--serve-all`); creates one HTTP server per AirPlay device with deterministic ports/UUIDs
+- **`internal/renderer/`** - Renderer instance management
 - **`internal/discovery/`** - mDNS service discovery for `_raop._tcp` (AirPlay) and `_googlecast._tcp` (Chromecast)
 - **`internal/upnp/`** - SOAP handlers for AVTransport, RenderingControl, ConnectionManager services
 - **`internal/ssdp/`** - SSDP announce/search responder for DLNA device advertisement
@@ -35,10 +35,9 @@ Media servers (Music Assistant, Plex) → DLNA/UPnP → Airbridge → AirPlay sp
 - **AirPlay** (`device_type: "airplay"`): Push model - Airbridge streams audio to device via RAOP
 - **Chromecast** (`device_type: "chromecast"`): Pull model - Device fetches media from URL via CASTV2
 
-### Two Rendering Architectures
+### Rendering Architecture
 
-1. **`--serve-all` mode** (`internal/renderer/Manager`): One HTTP server per device on different ports
-2. **`--web` mode** (`internal/bridge/Bridge`): Single HTTP server with embedded devices using path-based routing (`/renderer/{uuid}/...`)
+**`--web` mode** (`internal/bridge/Bridge`): Single HTTP server with embedded devices using path-based routing (`/renderer/{uuid}/...`)
 
 ## Conventions
 
