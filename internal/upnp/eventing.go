@@ -120,6 +120,7 @@ func (em *EventManager) NotifyVolume(volume int, mute bool) {
 
 	log.Printf("Found %d renderingcontrol subscriptions to notify for volume=%d, mute=%v", len(subs), volume, mute)
 	for _, sub := range subs {
+		log.Printf("Notifying SID=%s callback=%s", sub.SID, sub.Callback)
 		em.sendNotify(sub, buildVolumeEvent(volume, mute))
 	}
 }
