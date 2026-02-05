@@ -745,9 +745,10 @@ func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request,
     <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
     <friendlyName>%s</friendlyName>
     <manufacturer>Airbridge</manufacturer>
-    <modelName>Airbridge Renderer</modelName>
-    <modelDescription>DLNA to AirPlay Bridge - %s</modelDescription>
+    <modelName>Airbridge (%s)</modelName>
+    <modelDescription>DLNA to AirPlay Bridge</modelDescription>
     <modelNumber>1.0</modelNumber>
+    <serialNumber>%s</serialNumber>
     <UDN>uuid:%s</UDN>
     <serviceList>
       <service>
@@ -773,7 +774,7 @@ func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request,
       </service>
     </serviceList>
   </device>
-</root>`, baseURL, renderer.Name, renderer.AirPlayName, renderer.ID,
+</root>`, baseURL, renderer.Name, renderer.Name, renderer.ID, renderer.ID,
 		renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID)
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
