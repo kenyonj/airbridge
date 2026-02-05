@@ -130,6 +130,8 @@ func (em *EventManager) sendNotify(sub *Subscription, body string) {
 	seq := sub.SeqNumber
 	em.mu.Unlock()
 
+	log.Printf("Sending NOTIFY body: %s", body)
+
 	req, err := http.NewRequest("NOTIFY", sub.Callback, bytes.NewReader([]byte(body)))
 	if err != nil {
 		log.Printf("Notify error creating request: %v", err)
