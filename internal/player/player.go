@@ -40,6 +40,9 @@ type RAOPPlayer struct {
 
 	// Volume passthrough for external API control
 	volumePassthrough *VolumePassthrough
+
+	// Volume plugin callback (takes precedence over volumePassthrough)
+	volumePluginCallback func(volume int) error
 }
 
 // NewRAOPPlayer creates a new RAOP player for the given AirPlay device.
@@ -55,6 +58,14 @@ func (p *RAOPPlayer) SetVolumePassthrough(vp *VolumePassthrough) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.volumePassthrough = vp
+}
+
+// SetVolumePluginCallback sets a callback for plugin-based volume control.
+// This takes precedence over the legacy volumePassthrough configuration.
+func (p *RAOPPlayer) SetVolumePluginCallback(cb func(volume int) error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.volumePluginCallback = cb
 }
 
 // Play starts streaming audio from the given URI to the AirPlay device.
@@ -214,7 +225,16 @@ func (p *RAOPPlayer) SetVolume(ctx context.Context, volume int) error {
 	log.Printf("RAOP SetVolume: %d", volume)
 	p.volume = volume
 
-	// Call volume passthrough API if configured
+	// Plugin callback takes precedence over legacy passthrough
+	if p.volumePluginCallback != nil {
+		if err := p.volumePluginCallback(volume); err != nil {
+			log.Printf("Volume plugin error: %v", err)
+			// Don't return error - volume control is best-effort
+		}
+		return nil
+	}
+
+	// Call volume passthrough API if configured (legacy mode)
 	if p.volumePassthrough != nil && p.volumePassthrough.URL != "" {
 		if err := p.callVolumePassthrough(ctx, volume); err != nil {
 			log.Printf("Volume passthrough error: %v", err)

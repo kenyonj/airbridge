@@ -15,58 +15,41 @@
 
             {{if eq .Renderer.DeviceType "airplay"}}
             <div class="ml-6 border-t pt-4 mt-4">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Volume Passthrough (Optional)</h4>
-                <p class="text-xs text-gray-500 mb-3">Configure an external API to control volume in real-time. Use <code class="bg-gray-100 px-1 rounded">\{\{volume\}\}</code> as placeholder for 0-100 value.</p>
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Volume Control (Optional)</h4>
+                <p class="text-xs text-gray-500 mb-3">Link to a volume plugin to enable external volume control.</p>
+                
+                {{if .Plugins}}
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs text-gray-600 mb-1">API URL</label>
-                        <input 
-                            type="text" 
-                            name="volume_url" 
-                            value="{{.Renderer.VolumeURL}}"
-                            placeholder="http://192.168.1.x/api/v3/zones/{zone_id}/volume"
+                        <label class="block text-xs text-gray-600 mb-1">Volume Plugin</label>
+                        <select name="volume_plugin_id" id="volume-plugin-select" 
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            onchange="loadPluginZones(this.value)">
+                            <option value="">None (no volume control)</option>
+                            {{range .Plugins}}
+                            <option value="{{.ID}}" data-type="{{.Type}}" {{if eq .ID $.Renderer.VolumePluginID}}selected{{end}}>
+                                {{.Name}} ({{if eq .Type "juke_audio"}}Juke Audio{{else if eq .Type "webhook"}}Webhook{{else}}{{.Type}}{{end}})
+                            </option>
+                            {{end}}
+                        </select>
+                    </div>
+                    <div id="zone-select-container" class="{{if not .Renderer.VolumePluginID}}hidden{{end}}">
+                        <label class="block text-xs text-gray-600 mb-1">Zone/Device</label>
+                        <select name="volume_device_id" id="volume-zone-select"
                             class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div class="flex space-x-3">
-                        <div class="w-24">
-                            <label class="block text-xs text-gray-600 mb-1">Method</label>
-                            <select name="volume_method" class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="PUT" {{if eq .Renderer.VolumeMethod "PUT"}}selected{{end}}>PUT</option>
-                                <option value="POST" {{if eq .Renderer.VolumeMethod "POST"}}selected{{end}}>POST</option>
-                                <option value="GET" {{if eq .Renderer.VolumeMethod "GET"}}selected{{end}}>GET</option>
-                            </select>
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs text-gray-600 mb-1">Request Body (JSON)</label>
-                            <input 
-                                type="text" 
-                                name="volume_body" 
-                                value="{{.Renderer.VolumeBody}}"
-                                placeholder='{"volume": \{\{volume\}\}}'
-                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        </div>
-                    </div>
-                    <div class="flex space-x-3">
-                        <div class="flex-1">
-                            <label class="block text-xs text-gray-600 mb-1">Auth Username</label>
-                            <input 
-                                type="text" 
-                                name="volume_auth_user" 
-                                value="{{.Renderer.VolumeAuthUser}}"
-                                placeholder="Admin"
-                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs text-gray-600 mb-1">Auth Password</label>
-                            <input 
-                                type="password" 
-                                name="volume_auth_pass" 
-                                value="{{.Renderer.VolumeAuthPass}}"
-                                placeholder="••••••••"
-                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        </div>
+                            <option value="">Select a zone...</option>
+                            {{range .Zones}}
+                            <option value="{{.ID}}" {{if eq .ID $.Renderer.VolumeDeviceID}}selected{{end}}>{{.Name}}</option>
+                            {{end}}
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1" id="zone-note">For webhook plugins, leave zone empty.</p>
                     </div>
                 </div>
+                {{else}}
+                <div class="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                    No volume plugins configured. <a href="/admin/settings" class="text-indigo-600 hover:underline">Add a plugin</a> in Settings to enable volume control.
+                </div>
+                {{end}}
             </div>
             {{end}}
 
@@ -86,3 +69,60 @@
         </div>
     </form>
 </div>
+
+<script>
+function loadPluginZones(pluginId) {
+    var container = document.getElementById('zone-select-container');
+    var select = document.getElementById('volume-zone-select');
+    var note = document.getElementById('zone-note');
+    var pluginSelect = document.getElementById('volume-plugin-select');
+    var selectedOption = pluginSelect.options[pluginSelect.selectedIndex];
+    var pluginType = selectedOption ? selectedOption.getAttribute('data-type') : '';
+    
+    if (!pluginId) {
+        container.classList.add('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    
+    // For webhook plugins, zones are not applicable
+    if (pluginType === 'webhook') {
+        select.innerHTML = '<option value="">N/A (webhook)</option>';
+        note.textContent = 'Webhook plugins control volume directly without zones.';
+        return;
+    }
+    
+    note.textContent = 'Loading zones...';
+    select.innerHTML = '<option value="">Loading...</option>';
+    
+    fetch('/admin/plugins/' + pluginId + '/zones')
+        .then(function(response) { return response.json(); })
+        .then(function(zones) {
+            select.innerHTML = '<option value="">Select a zone...</option>';
+            zones.forEach(function(zone) {
+                var option = document.createElement('option');
+                option.value = zone.id;
+                option.textContent = zone.name;
+                select.appendChild(option);
+            });
+            note.textContent = zones.length + ' zone(s) available';
+        })
+        .catch(function(err) {
+            select.innerHTML = '<option value="">Error loading zones</option>';
+            note.textContent = 'Failed to load zones';
+        });
+}
+
+// Load zones on page load if plugin is already selected
+(function() {
+    var pluginSelect = document.getElementById('volume-plugin-select');
+    if (pluginSelect && pluginSelect.value) {
+        // Don't reload if zones are already populated
+        var zoneSelect = document.getElementById('volume-zone-select');
+        if (zoneSelect && zoneSelect.options.length <= 1) {
+            loadPluginZones(pluginSelect.value);
+        }
+    }
+})();
+</script>

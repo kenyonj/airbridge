@@ -31,12 +31,15 @@ type Renderer struct {
 	CastEnabled     bool      `json:"cast_enabled"` // Chromecast receiver enabled
 	CastPort        int       `json:"cast_port"`    // Chromecast receiver port (default 8009)
 	CreatedAt       time.Time `json:"created_at"`
-	// Volume passthrough for AirPlay (external API control)
+	// Volume passthrough for AirPlay (external API control) - legacy manual config
 	VolumeURL      string `json:"volume_url"`       // External volume API URL (with {{volume}} placeholder)
 	VolumeMethod   string `json:"volume_method"`    // HTTP method (GET, POST, PUT)
 	VolumeBody     string `json:"volume_body"`      // Request body template (with {{volume}} placeholder)
 	VolumeAuthUser string `json:"volume_auth_user"` // Basic auth username
 	VolumeAuthPass string `json:"volume_auth_pass"` // Basic auth password
+	// Plugin-based volume control
+	VolumePluginID string `json:"volume_plugin_id"` // Plugin instance ID
+	VolumeDeviceID string `json:"volume_device_id"` // Device/zone ID within the plugin
 }
 
 // Open opens or creates the database at the given path.
@@ -105,6 +108,22 @@ func (db *DB) migrate() error {
 	db.addColumnIfNotExists("renderers", "volume_body", "TEXT NOT NULL DEFAULT ''")
 	db.addColumnIfNotExists("renderers", "volume_auth_user", "TEXT NOT NULL DEFAULT ''")
 	db.addColumnIfNotExists("renderers", "volume_auth_pass", "TEXT NOT NULL DEFAULT ''")
+	// Add plugin-based volume control columns
+	db.addColumnIfNotExists("renderers", "volume_plugin_id", "TEXT NOT NULL DEFAULT ''")
+	db.addColumnIfNotExists("renderers", "volume_device_id", "TEXT NOT NULL DEFAULT ''")
+
+	// Create plugins table for volume control integrations
+	_, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS plugins (
+		id TEXT PRIMARY KEY,
+		type TEXT NOT NULL,
+		name TEXT NOT NULL,
+		config TEXT NOT NULL DEFAULT '{}',
+		enabled INTEGER DEFAULT 1,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`)
+	if err != nil {
+		log.Printf("Failed to create plugins table: %v", err)
+	}
 
 	log.Println("Database migrations complete")
 	return nil
@@ -142,7 +161,9 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 		       COALESCE(volume_method, 'PUT') as volume_method,
 		       COALESCE(volume_body, '') as volume_body,
 		       COALESCE(volume_auth_user, '') as volume_auth_user,
-		       COALESCE(volume_auth_pass, '') as volume_auth_pass
+		       COALESCE(volume_auth_pass, '') as volume_auth_pass,
+		       COALESCE(volume_plugin_id, '') as volume_plugin_id,
+		       COALESCE(volume_device_id, '') as volume_device_id
 		FROM renderers 
 		ORDER BY created_at ASC
 	`)
@@ -157,7 +178,8 @@ func (db *DB) ListRenderers() ([]Renderer, error) {
 		var enabled, castEnabled int
 		if err := rows.Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
 			&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort,
-			&r.VolumeURL, &r.VolumeMethod, &r.VolumeBody, &r.VolumeAuthUser, &r.VolumeAuthPass); err != nil {
+			&r.VolumeURL, &r.VolumeMethod, &r.VolumeBody, &r.VolumeAuthUser, &r.VolumeAuthPass,
+			&r.VolumePluginID, &r.VolumeDeviceID); err != nil {
 			return nil, err
 		}
 		r.Enabled = enabled == 1
@@ -189,11 +211,14 @@ func (db *DB) GetRenderer(id string) (*Renderer, error) {
 		       COALESCE(volume_method, 'PUT') as volume_method,
 		       COALESCE(volume_body, '') as volume_body,
 		       COALESCE(volume_auth_user, '') as volume_auth_user,
-		       COALESCE(volume_auth_pass, '') as volume_auth_pass
+		       COALESCE(volume_auth_pass, '') as volume_auth_pass,
+		       COALESCE(volume_plugin_id, '') as volume_plugin_id,
+		       COALESCE(volume_device_id, '') as volume_device_id
 		FROM renderers WHERE id = ?
 	`, id).Scan(&r.ID, &r.Name, &r.AirPlayDeviceID, &r.AirPlayName, &r.Port, &enabled, &r.CreatedAt,
 		&r.DeviceType, &r.DeviceID, &r.DeviceName, &castEnabled, &r.CastPort,
-		&r.VolumeURL, &r.VolumeMethod, &r.VolumeBody, &r.VolumeAuthUser, &r.VolumeAuthPass)
+		&r.VolumeURL, &r.VolumeMethod, &r.VolumeBody, &r.VolumeAuthUser, &r.VolumeAuthPass,
+		&r.VolumePluginID, &r.VolumeDeviceID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -260,10 +285,12 @@ func (db *DB) UpdateRenderer(r *Renderer) error {
 	_, err := db.conn.Exec(`
 		UPDATE renderers SET name = ?, airplay_device_id = ?, airplay_name = ?, port = ?, enabled = ?,
 		       device_type = ?, device_id = ?, device_name = ?,
-		       volume_url = ?, volume_method = ?, volume_body = ?, volume_auth_user = ?, volume_auth_pass = ?
+		       volume_url = ?, volume_method = ?, volume_body = ?, volume_auth_user = ?, volume_auth_pass = ?,
+		       volume_plugin_id = ?, volume_device_id = ?
 		WHERE id = ?
 	`, r.Name, r.AirPlayDeviceID, r.AirPlayName, r.Port, enabled, deviceType, deviceID, deviceName,
-		r.VolumeURL, r.VolumeMethod, r.VolumeBody, r.VolumeAuthUser, r.VolumeAuthPass, r.ID)
+		r.VolumeURL, r.VolumeMethod, r.VolumeBody, r.VolumeAuthUser, r.VolumeAuthPass,
+		r.VolumePluginID, r.VolumeDeviceID, r.ID)
 	return err
 }
 
@@ -330,5 +357,86 @@ func (db *DB) SetSetting(key, value string) error {
 		INSERT INTO settings (key, value) VALUES (?, ?)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value
 	`, key, value)
+	return err
+}
+
+// Plugin represents a configured volume control plugin.
+type Plugin struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`      // "juke_audio", "webhook", etc.
+	Name      string    `json:"name"`      // User-defined name
+	Config    string    `json:"config"`    // JSON-encoded configuration
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// CreatePlugin stores a new plugin configuration.
+func (db *DB) CreatePlugin(p *Plugin) error {
+	_, err := db.conn.Exec(`
+		INSERT INTO plugins (id, type, name, config, enabled, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, p.ID, p.Type, p.Name, p.Config, p.Enabled, p.CreatedAt)
+	return err
+}
+
+// ListPlugins returns all configured plugins.
+func (db *DB) ListPlugins() ([]Plugin, error) {
+	rows, err := db.conn.Query(`
+		SELECT id, type, name, config, enabled, created_at
+		FROM plugins
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var plugins []Plugin
+	for rows.Next() {
+		var p Plugin
+		var enabled int
+		if err := rows.Scan(&p.ID, &p.Type, &p.Name, &p.Config, &enabled, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		p.Enabled = enabled != 0
+		plugins = append(plugins, p)
+	}
+	return plugins, rows.Err()
+}
+
+// GetPlugin retrieves a plugin by ID.
+func (db *DB) GetPlugin(id string) (*Plugin, error) {
+	var p Plugin
+	var enabled int
+	err := db.conn.QueryRow(`
+		SELECT id, type, name, config, enabled, created_at
+		FROM plugins WHERE id = ?
+	`, id).Scan(&p.ID, &p.Type, &p.Name, &p.Config, &enabled, &p.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	p.Enabled = enabled != 0
+	return &p, nil
+}
+
+// UpdatePlugin updates a plugin configuration.
+func (db *DB) UpdatePlugin(p *Plugin) error {
+	enabled := 0
+	if p.Enabled {
+		enabled = 1
+	}
+	_, err := db.conn.Exec(`
+		UPDATE plugins SET type = ?, name = ?, config = ?, enabled = ?
+		WHERE id = ?
+	`, p.Type, p.Name, p.Config, enabled, p.ID)
+	return err
+}
+
+// DeletePlugin removes a plugin.
+func (db *DB) DeletePlugin(id string) error {
+	_, err := db.conn.Exec(`DELETE FROM plugins WHERE id = ?`, id)
 	return err
 }

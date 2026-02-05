@@ -16,6 +16,7 @@ import (
 	"github.com/kenyonj/airbridge/internal/database"
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/player"
+	"github.com/kenyonj/airbridge/internal/plugins"
 	"github.com/kenyonj/airbridge/internal/ssdp"
 	"github.com/kenyonj/airbridge/internal/state"
 	"github.com/kenyonj/airbridge/internal/upnp"
@@ -55,6 +56,7 @@ type Bridge struct {
 	renderers      map[string]*RendererInstance // keyed by renderer ID (UUID)
 	castAdvertiser *cast.Advertiser             // Chromecast mDNS advertiser
 	castServers    map[string]*cast.Server      // CASTV2 servers per renderer
+	plugins        *plugins.Registry            // Volume control plugins
 	mu             sync.RWMutex
 
 	ctx    context.Context
@@ -81,6 +83,13 @@ func (b *Bridge) SetStateBroadcaster(cb StateBroadcaster) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.onStateChange = cb
+}
+
+// SetPluginRegistry sets the plugin registry for volume control.
+func (b *Bridge) SetPluginRegistry(registry *plugins.Registry) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.plugins = registry
 }
 
 // Start initializes and starts the bridge.
@@ -216,8 +225,19 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 		log.Printf("Added Chromecast renderer: %s -> %s:%d", r.Name, device.Host, device.Port)
 	default: // "airplay"
 		raopPlayer := player.NewRAOPPlayer(device)
-		// Configure volume passthrough if set
-		if r.VolumeURL != "" {
+		// Configure volume control from plugin if set
+		if r.VolumePluginID != "" && b.plugins != nil {
+			if pluginInstance, ok := b.plugins.GetInstance(r.VolumePluginID); ok {
+				deviceID := r.VolumeDeviceID
+				raopPlayer.SetVolumePluginCallback(func(volume int) error {
+					return pluginInstance.SetVolume(deviceID, volume)
+				})
+				log.Printf("Configured volume plugin for %s: plugin=%s, device=%s", r.Name, r.VolumePluginID, deviceID)
+			} else {
+				log.Printf("Warning: volume plugin %s not found for renderer %s", r.VolumePluginID, r.Name)
+			}
+		} else if r.VolumeURL != "" {
+			// Legacy volume passthrough (backward compatibility)
 			raopPlayer.SetVolumePassthrough(&player.VolumePassthrough{
 				URL:      r.VolumeURL,
 				Method:   r.VolumeMethod,
@@ -225,7 +245,7 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 				AuthUser: r.VolumeAuthUser,
 				AuthPass: r.VolumeAuthPass,
 			})
-			log.Printf("Configured volume passthrough for %s: %s", r.Name, r.VolumeURL)
+			log.Printf("Configured legacy volume passthrough for %s: %s", r.Name, r.VolumeURL)
 		}
 		inst.Player = raopPlayer
 		log.Printf("Added AirPlay renderer: %s -> %s:%d", r.Name, device.Host, device.Port)

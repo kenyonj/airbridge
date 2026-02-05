@@ -1,0 +1,203 @@
+<div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+    <form id="plugin-form">
+        <h3 class="font-medium text-gray-800 mb-4">{{if .Plugin}}Edit Plugin{{else}}Add New Plugin{{end}}</h3>
+        
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Plugin Type</label>
+                    <select name="type" id="plugin-type" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500" {{if .Plugin}}disabled{{end}} onchange="togglePluginFields()">
+                        <option value="juke_audio" {{if and .Plugin (eq .Plugin.Type "juke_audio")}}selected{{end}}>Juke Audio</option>
+                        <option value="webhook" {{if and .Plugin (eq .Plugin.Type "webhook")}}selected{{end}}>Webhook</option>
+                    </select>
+                    {{if .Plugin}}<input type="hidden" name="type" value="{{.Plugin.Type}}">{{end}}
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Name</label>
+                    <input type="text" name="name" value="{{if .Plugin}}{{.Plugin.Name}}{{end}}" placeholder="My Juke System" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <!-- Juke Audio fields -->
+            <div id="juke-fields" class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Host URL</label>
+                    <input type="text" name="host" value="{{.Config.host}}" placeholder="http://192.168.1.100" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Username</label>
+                        <input type="text" name="username" value="{{.Config.username}}" placeholder="Admin" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Password</label>
+                        <input type="password" name="password" value="{{.Config.password}}" placeholder="••••••••" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Webhook fields -->
+            <div id="webhook-fields" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">URL</label>
+                    <input type="text" name="url" value="{{.Config.url}}" placeholder="http://homeassistant:8123/api/services/..." class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <p class="text-xs text-gray-500 mt-1">Use <code class="bg-gray-100 px-1 rounded">\{\{volume\}\}</code> (0-100) or <code class="bg-gray-100 px-1 rounded">\{\{volume_float\}\}</code> (0.0-1.0)</p>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Method</label>
+                        <select name="method" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="POST" {{if eq .Config.method "POST"}}selected{{end}}>POST</option>
+                            <option value="PUT" {{if eq .Config.method "PUT"}}selected{{end}}>PUT</option>
+                            <option value="GET" {{if eq .Config.method "GET"}}selected{{end}}>GET</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Auth User</label>
+                        <input type="text" name="auth_user" value="{{.Config.auth_user}}" placeholder="Optional" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Auth Pass</label>
+                        <input type="password" name="auth_pass" value="{{.Config.auth_pass}}" placeholder="Optional" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Request Body (JSON)</label>
+                    <input type="text" name="body" value="{{.Config.body}}" placeholder='{"volume": \{\{volume\}\}}' class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Headers (comma-separated)</label>
+                    <input type="text" name="headers" value="{{.Config.headers}}" placeholder="Authorization: Bearer token123" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <!-- Test result display -->
+            <div id="test-result" class="hidden p-3 rounded text-sm"></div>
+        </div>
+
+        <div class="flex justify-between items-center mt-4">
+            <button type="button" id="test-btn" onclick="testPluginConnection()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span>Test Connection</span>
+            </button>
+            <div class="flex space-x-2">
+                <button type="button" onclick="document.getElementById('plugin-form-container').innerHTML=''" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+                <button type="button" id="save-btn" onclick="savePlugin()" disabled class="px-4 py-2 bg-indigo-400 text-white rounded cursor-not-allowed" title="Test connection first">{{if .Plugin}}Save{{else}}Add Plugin{{end}}</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+var pluginTested = false;
+var pluginId = '{{if .Plugin}}{{.Plugin.ID}}{{end}}';
+
+function togglePluginFields() {
+    var type = document.getElementById('plugin-type').value;
+    document.getElementById('juke-fields').classList.toggle('hidden', type !== 'juke_audio');
+    document.getElementById('webhook-fields').classList.toggle('hidden', type !== 'webhook');
+    // Reset test state when type changes
+    resetTestState();
+}
+
+function resetTestState() {
+    pluginTested = false;
+    var saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700', 'cursor-pointer');
+    saveBtn.classList.add('bg-indigo-400', 'cursor-not-allowed');
+    saveBtn.title = 'Test connection first';
+    document.getElementById('test-result').classList.add('hidden');
+}
+
+function getFormData() {
+    var form = document.getElementById('plugin-form');
+    var formData = new FormData(form);
+    var data = {};
+    formData.forEach(function(value, key) {
+        data[key] = value;
+    });
+    return data;
+}
+
+function testPluginConnection() {
+    var testBtn = document.getElementById('test-btn');
+    var resultDiv = document.getElementById('test-result');
+    
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg><span>Testing...</span>';
+    
+    var data = getFormData();
+    
+    fetch('/admin/plugins/test-config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(result) {
+        resultDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+        if (result.success) {
+            resultDiv.classList.add('bg-green-100', 'text-green-800');
+            resultDiv.innerHTML = '✓ Connection successful' + (result.zones ? ' - Found ' + result.zones + ' zone(s)' : '');
+            pluginTested = true;
+            var saveBtn = document.getElementById('save-btn');
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('bg-indigo-400', 'cursor-not-allowed');
+            saveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'cursor-pointer');
+            saveBtn.title = '';
+        } else {
+            resultDiv.classList.add('bg-red-100', 'text-red-800');
+            resultDiv.innerHTML = '✗ Connection failed: ' + (result.error || 'Unknown error');
+            pluginTested = false;
+        }
+    })
+    .catch(function(err) {
+        resultDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800');
+        resultDiv.classList.add('bg-red-100', 'text-red-800');
+        resultDiv.innerHTML = '✗ Test failed: ' + err.message;
+    })
+    .finally(function() {
+        testBtn.disabled = false;
+        testBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg><span>Test Connection</span>';
+    });
+}
+
+function savePlugin() {
+    if (!pluginTested) {
+        alert('Please test the connection first');
+        return;
+    }
+    
+    var data = getFormData();
+    var url = '/admin/plugins' + (pluginId ? '/' + pluginId : '');
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams(data).toString()
+    })
+    .then(function(response) { return response.text(); })
+    .then(function(html) {
+        document.getElementById('plugin-list').innerHTML = html;
+        document.getElementById('plugin-form-container').innerHTML = '';
+    })
+    .catch(function(err) {
+        alert('Failed to save plugin: ' + err.message);
+    });
+}
+
+// Initialize on load
+togglePluginFields();
+// If editing existing plugin, allow save without re-testing
+{{if .Plugin}}
+pluginTested = true;
+var saveBtn = document.getElementById('save-btn');
+saveBtn.disabled = false;
+saveBtn.classList.remove('bg-indigo-400', 'cursor-not-allowed');
+saveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'cursor-pointer');
+saveBtn.title = '';
+{{end}}
+</script>

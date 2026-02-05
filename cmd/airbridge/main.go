@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math"
@@ -19,6 +20,9 @@ import (
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/httpserver"
 	"github.com/kenyonj/airbridge/internal/player"
+	"github.com/kenyonj/airbridge/internal/plugins"
+	"github.com/kenyonj/airbridge/internal/plugins/juke"
+	"github.com/kenyonj/airbridge/internal/plugins/webhook"
 	"github.com/kenyonj/airbridge/internal/ssdp"
 	"github.com/kenyonj/airbridge/internal/state"
 	"github.com/kenyonj/airbridge/internal/upnp"
@@ -357,8 +361,13 @@ func runDemoServer(ctx context.Context, httpPort int) {
 	demoDisco := web.NewDemoDiscovery()
 	demoController := web.NewDemoController()
 
+	// Create plugin registry for demo mode
+	demoPlugins := plugins.NewRegistry()
+	juke.Register(demoPlugins)
+	webhook.Register(demoPlugins)
+
 	// Create web server with demo components
-	webServer, err := web.NewServer(demoDB, demoDisco, demoController, httpPort)
+	webServer, err := web.NewServer(demoDB, demoDisco, demoController, httpPort, demoPlugins)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create web server: %v\n", err)
 		os.Exit(1)
@@ -426,8 +435,19 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 	br := bridge.NewBridge(db, disco, httpPort+1)
 	defer br.Stop()
 
+	// Create plugin registry and register plugin types
+	pluginRegistry := plugins.NewRegistry()
+	juke.Register(pluginRegistry)
+	webhook.Register(pluginRegistry)
+
+	// Load existing plugins from database
+	loadPluginsFromDB(db, pluginRegistry)
+
+	// Set plugin registry on bridge for volume control
+	br.SetPluginRegistry(pluginRegistry)
+
 	// Create web server first so we can wire up state broadcasting
-	webServer, err := web.NewServer(db, disco, br, httpPort+1)
+	webServer, err := web.NewServer(db, disco, br, httpPort+1, pluginRegistry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create web server: %v\n", err)
 		os.Exit(1)
@@ -473,4 +493,39 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// loadPluginsFromDB loads existing plugins from the database into the registry.
+func loadPluginsFromDB(db *database.DB, registry *plugins.Registry) {
+	dbPlugins, err := db.ListPlugins()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load plugins: %v\n", err)
+		return
+	}
+
+	for _, p := range dbPlugins {
+		if !p.Enabled {
+			continue
+		}
+
+		var config map[string]string
+		if err := json.Unmarshal([]byte(p.Config), &config); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to parse plugin config for %s: %v\n", p.Name, err)
+			continue
+		}
+
+		_, err := registry.CreateInstance(plugins.PluginConfig{
+			ID:      p.ID,
+			Type:    p.Type,
+			Name:    p.Name,
+			Config:  config,
+			Enabled: p.Enabled,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create plugin instance %s: %v\n", p.Name, err)
+			continue
+		}
+
+		fmt.Printf("Loaded plugin: %s (%s)\n", p.Name, p.Type)
+	}
 }

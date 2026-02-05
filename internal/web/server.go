@@ -4,6 +4,7 @@ package web
 import (
 	"crypto/sha256"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/kenyonj/airbridge/internal/database"
 	"github.com/kenyonj/airbridge/internal/discovery"
+	"github.com/kenyonj/airbridge/internal/plugins"
 )
 
 // Version is the current Airbridge version, displayed in the web UI.
@@ -31,6 +33,7 @@ type Server struct {
 	templates *template.Template
 	basePort  int
 	hub       *Hub
+	plugins   *plugins.Registry
 }
 
 // DBInterface defines the database operations needed by the web server.
@@ -44,6 +47,12 @@ type DBInterface interface {
 	ToggleRenderer(id string) error
 	ToggleCastReceiver(id string) error
 	RenameRenderer(id, name string) error
+	// Plugin methods
+	ListPlugins() ([]database.Plugin, error)
+	GetPlugin(id string) (*database.Plugin, error)
+	CreatePlugin(p *database.Plugin) error
+	UpdatePlugin(p *database.Plugin) error
+	DeletePlugin(id string) error
 }
 
 // DiscoveryInterface defines the discovery operations needed by the web server.
@@ -90,7 +99,7 @@ type RendererController interface {
 }
 
 // NewServer creates a new web server.
-func NewServer(db DBInterface, disco DiscoveryInterface, renderers RendererController, basePort int) (*Server, error) {
+func NewServer(db DBInterface, disco DiscoveryInterface, renderers RendererController, basePort int, pluginRegistry *plugins.Registry) (*Server, error) {
 	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -106,6 +115,7 @@ func NewServer(db DBInterface, disco DiscoveryInterface, renderers RendererContr
 		templates: tmpl,
 		basePort:  basePort,
 		hub:       hub,
+		plugins:   pluginRegistry,
 	}, nil
 }
 
@@ -119,6 +129,10 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/server/status", s.handleServerStatus)
 	mux.HandleFunc("/admin/settings", s.handleSettings)
 	mux.HandleFunc("/admin/settings/reset", s.handleSettingsReset)
+	mux.HandleFunc("/admin/plugins", s.handlePluginsList)
+	mux.HandleFunc("/admin/plugins/test-config", s.handlePluginTestConfig)
+	mux.HandleFunc("/admin/plugins/", s.handlePluginAction)
+	mux.HandleFunc("/admin/plugins/new", s.handlePluginNew)
 	mux.HandleFunc("/admin/ws", s.hub.HandleWebSocket)
 }
 
@@ -539,11 +553,24 @@ func (s *Server) editRendererForm(w http.ResponseWriter, r *http.Request, id str
 		return
 	}
 
+	// Get list of plugins for volume control dropdown
+	dbPlugins, _ := s.db.ListPlugins()
+
+	// Get zones for the currently selected plugin (if any)
+	var zones []plugins.VolumeDevice
+	if renderer.VolumePluginID != "" {
+		if instance, ok := s.plugins.GetInstance(renderer.VolumePluginID); ok {
+			zones, _ = instance.ListDevices()
+		}
+	}
+
 	data := map[string]interface{}{
 		"Renderer": RendererView{
 			Renderer: *renderer,
 			Running:  s.renderers.IsRunning(id),
 		},
+		"Plugins": dbPlugins,
+		"Zones":   zones,
 	}
 
 	s.renderPartial(w, "renderer_edit.html", data)
@@ -584,16 +611,10 @@ func (s *Server) updateRenderer(w http.ResponseWriter, r *http.Request, id strin
 	}
 	renderer.Name = name
 
-	// Update volume passthrough fields (only for AirPlay)
+	// Update volume plugin fields (only for AirPlay)
 	if renderer.DeviceType == "airplay" || renderer.DeviceType == "" {
-		renderer.VolumeURL = strings.TrimSpace(r.FormValue("volume_url"))
-		renderer.VolumeMethod = r.FormValue("volume_method")
-		if renderer.VolumeMethod == "" {
-			renderer.VolumeMethod = "PUT"
-		}
-		renderer.VolumeBody = r.FormValue("volume_body")
-		renderer.VolumeAuthUser = r.FormValue("volume_auth_user")
-		renderer.VolumeAuthPass = r.FormValue("volume_auth_pass")
+		renderer.VolumePluginID = strings.TrimSpace(r.FormValue("volume_plugin_id"))
+		renderer.VolumeDeviceID = strings.TrimSpace(r.FormValue("volume_device_id"))
 	}
 
 	if err := s.db.UpdateRenderer(renderer); err != nil {
@@ -601,9 +622,9 @@ func (s *Server) updateRenderer(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 
-	log.Printf("Updated renderer %s: name=%s, volume_url=%s", id, name, renderer.VolumeURL)
+	log.Printf("Updated renderer %s: name=%s, volume_plugin=%s, volume_device=%s", id, name, renderer.VolumePluginID, renderer.VolumeDeviceID)
 
-	// Restart the renderer to apply new volume passthrough config
+	// Restart the renderer to apply new volume config
 	if s.renderers.IsRunning(id) {
 		s.renderers.StopRenderer(id)
 		if err := s.renderers.StartRenderer(id); err != nil {
@@ -718,4 +739,399 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm %ds", m, s)
 	}
 	return fmt.Sprintf("%ds", s)
+}
+
+// PluginView represents a plugin with zone count for the UI.
+type PluginView struct {
+	database.Plugin
+	ZoneCount int
+}
+
+// handlePluginsList returns the list of configured plugins.
+func (s *Server) handlePluginsList(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		// Create new plugin
+		s.createPlugin(w, r)
+		return
+	}
+
+	s.renderPluginsList(w)
+}
+
+// renderPluginsList renders the plugin list template (used by multiple handlers).
+func (s *Server) renderPluginsList(w http.ResponseWriter) {
+	plugins, err := s.db.ListPlugins()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build plugin views with zone counts
+	views := make([]PluginView, len(plugins))
+	for i, p := range plugins {
+		views[i] = PluginView{Plugin: p}
+		// Try to get zone count for Juke Audio plugins
+		if p.Type == "juke_audio" {
+			if instance, ok := s.plugins.GetInstance(p.ID); ok {
+				if devices, err := instance.ListDevices(); err == nil {
+					views[i].ZoneCount = len(devices)
+				}
+			}
+		}
+	}
+
+	s.templates.ExecuteTemplate(w, "plugins_list.html", map[string]interface{}{
+		"Plugins": views,
+	})
+}
+
+// handlePluginNew returns the new plugin form.
+func (s *Server) handlePluginNew(w http.ResponseWriter, r *http.Request) {
+	s.templates.ExecuteTemplate(w, "plugin_form.html", map[string]interface{}{
+		"Plugin": nil,
+		"Config": map[string]string{},
+	})
+}
+
+// handlePluginTestConfig tests a plugin configuration without saving it.
+func (s *Server) handlePluginTestConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var data map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request body",
+		})
+		return
+	}
+
+	pluginType := data["type"]
+	config := make(map[string]string)
+
+	// Build config based on plugin type
+	switch pluginType {
+	case "juke_audio":
+		config["host"] = data["host"]
+		config["username"] = data["username"]
+		config["password"] = data["password"]
+	case "webhook":
+		config["url"] = data["url"]
+		config["method"] = data["method"]
+		config["body"] = data["body"]
+		config["headers"] = data["headers"]
+		config["auth_user"] = data["auth_user"]
+		config["auth_pass"] = data["auth_pass"]
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Unknown plugin type",
+		})
+		return
+	}
+
+	// Create a temporary plugin instance to test
+	testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
+	instance, err := s.plugins.CreateInstance(plugins.PluginConfig{
+		ID:      testID,
+		Type:    pluginType,
+		Name:    "Test",
+		Config:  config,
+		Enabled: true,
+	})
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Remove the test instance after we're done
+	defer s.plugins.RemoveInstance(testID)
+
+	// Test the connection
+	if err := instance.TestConnection(); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// For Juke Audio, also get zone count
+	var zones int
+	if pluginType == "juke_audio" {
+		if devices, err := instance.ListDevices(); err == nil {
+			zones = len(devices)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"zones":   zones,
+	})
+}
+
+// handlePluginAction handles plugin CRUD operations.
+func (s *Server) handlePluginAction(w http.ResponseWriter, r *http.Request) {
+	// Parse plugin ID from path: /admin/plugins/{id} or /admin/plugins/{id}/action
+	path := strings.TrimPrefix(r.URL.Path, "/admin/plugins/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 || parts[0] == "" || parts[0] == "new" {
+		http.NotFound(w, r)
+		return
+	}
+
+	pluginID := parts[0]
+	action := ""
+	if len(parts) > 1 {
+		action = parts[1]
+	}
+
+	switch {
+	case r.Method == http.MethodDelete:
+		s.deletePlugin(w, r, pluginID)
+	case r.Method == http.MethodPost && action == "test":
+		s.testPlugin(w, r, pluginID)
+	case r.Method == http.MethodPost && action == "":
+		s.updatePlugin(w, r, pluginID)
+	case r.Method == http.MethodGet && action == "edit":
+		s.editPlugin(w, r, pluginID)
+	case r.Method == http.MethodGet && action == "zones":
+		s.listPluginZones(w, r, pluginID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) createPlugin(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	pluginType := r.FormValue("type")
+	name := r.FormValue("name")
+
+	// Build config based on plugin type
+	config := make(map[string]string)
+	switch pluginType {
+	case "juke_audio":
+		config["host"] = r.FormValue("host")
+		config["username"] = r.FormValue("username")
+		config["password"] = r.FormValue("password")
+	case "webhook":
+		config["url"] = r.FormValue("url")
+		config["method"] = r.FormValue("method")
+		config["body"] = r.FormValue("body")
+		config["headers"] = r.FormValue("headers")
+		config["auth_user"] = r.FormValue("auth_user")
+		config["auth_pass"] = r.FormValue("auth_pass")
+	}
+
+	configJSON, _ := json.Marshal(config)
+
+	// Generate ID
+	hash := sha256.Sum256([]byte(fmt.Sprintf("plugin:%s:%s:%d", pluginType, name, time.Now().UnixNano())))
+	id := fmt.Sprintf("%x", hash[:16])
+
+	plugin := &database.Plugin{
+		ID:        id,
+		Type:      pluginType,
+		Name:      name,
+		Config:    string(configJSON),
+		Enabled:   true,
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.db.CreatePlugin(plugin); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Create plugin instance in registry
+	s.plugins.CreateInstance(plugins.PluginConfig{
+		ID:      id,
+		Type:    pluginType,
+		Name:    name,
+		Config:  config,
+		Enabled: true,
+	})
+
+	log.Printf("Created plugin: %s (%s)", name, pluginType)
+
+	// Return updated plugin list (render directly, don't call handlePluginsList to avoid POST recursion)
+	s.renderPluginsList(w)
+}
+
+func (s *Server) editPlugin(w http.ResponseWriter, r *http.Request, pluginID string) {
+	plugin, err := s.db.GetPlugin(pluginID)
+	if err != nil || plugin == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var config map[string]string
+	json.Unmarshal([]byte(plugin.Config), &config)
+
+	s.templates.ExecuteTemplate(w, "plugin_form.html", map[string]interface{}{
+		"Plugin": plugin,
+		"Config": config,
+	})
+}
+
+func (s *Server) updatePlugin(w http.ResponseWriter, r *http.Request, pluginID string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	plugin, err := s.db.GetPlugin(pluginID)
+	if err != nil || plugin == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	plugin.Name = r.FormValue("name")
+
+	// Build config based on plugin type
+	config := make(map[string]string)
+	switch plugin.Type {
+	case "juke_audio":
+		config["host"] = r.FormValue("host")
+		config["username"] = r.FormValue("username")
+		config["password"] = r.FormValue("password")
+	case "webhook":
+		config["url"] = r.FormValue("url")
+		config["method"] = r.FormValue("method")
+		config["body"] = r.FormValue("body")
+		config["headers"] = r.FormValue("headers")
+		config["auth_user"] = r.FormValue("auth_user")
+		config["auth_pass"] = r.FormValue("auth_pass")
+	}
+
+	configJSON, _ := json.Marshal(config)
+	plugin.Config = string(configJSON)
+
+	if err := s.db.UpdatePlugin(plugin); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Recreate plugin instance with new config
+	s.plugins.RemoveInstance(pluginID)
+	s.plugins.CreateInstance(plugins.PluginConfig{
+		ID:      pluginID,
+		Type:    plugin.Type,
+		Name:    plugin.Name,
+		Config:  config,
+		Enabled: plugin.Enabled,
+	})
+
+	log.Printf("Updated plugin: %s", plugin.Name)
+
+	// Return updated plugin list
+	s.renderPluginsList(w)
+}
+
+func (s *Server) deletePlugin(w http.ResponseWriter, r *http.Request, pluginID string) {
+	plugin, _ := s.db.GetPlugin(pluginID)
+	if plugin != nil {
+		log.Printf("Deleting plugin: %s", plugin.Name)
+	}
+
+	s.plugins.RemoveInstance(pluginID)
+	s.db.DeletePlugin(pluginID)
+
+	// Return updated plugin list
+	s.renderPluginsList(w)
+}
+
+func (s *Server) testPlugin(w http.ResponseWriter, r *http.Request, pluginID string) {
+	instance, ok := s.plugins.GetInstance(pluginID)
+	if !ok {
+		// Try to create instance from DB
+		plugin, err := s.db.GetPlugin(pluginID)
+		if err != nil || plugin == nil {
+			http.Error(w, "Plugin not found", http.StatusNotFound)
+			return
+		}
+
+		var config map[string]string
+		json.Unmarshal([]byte(plugin.Config), &config)
+
+		instance, err = s.plugins.CreateInstance(plugins.PluginConfig{
+			ID:      pluginID,
+			Type:    plugin.Type,
+			Name:    plugin.Name,
+			Config:  config,
+			Enabled: plugin.Enabled,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := instance.TestConnection(); err != nil {
+		log.Printf("Plugin test failed: %v", err)
+	} else {
+		log.Printf("Plugin test succeeded")
+	}
+
+	// Return updated plugin list with zone count
+	s.renderPluginsList(w)
+}
+
+func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginID string) {
+	instance, ok := s.plugins.GetInstance(pluginID)
+	if !ok {
+		// Try to create instance from DB
+		plugin, err := s.db.GetPlugin(pluginID)
+		if err != nil || plugin == nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
+			return
+		}
+
+		var config map[string]string
+		json.Unmarshal([]byte(plugin.Config), &config)
+
+		instance, err = s.plugins.CreateInstance(plugins.PluginConfig{
+			ID:      pluginID,
+			Type:    plugin.Type,
+			Name:    plugin.Name,
+			Config:  config,
+			Enabled: plugin.Enabled,
+		})
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
+			return
+		}
+	}
+
+	devices, err := instance.ListDevices()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(devices)
+}
+
+// GetPluginRegistry returns the plugin registry for external use.
+func (s *Server) GetPluginRegistry() *plugins.Registry {
+	return s.plugins
 }

@@ -124,6 +124,7 @@ func (d *DemoDiscovery) GetDeviceUnified(deviceID string) *discovery.Device {
 // DemoDB provides mock database operations.
 type DemoDB struct {
 	renderers []database.Renderer
+	plugins   []database.Plugin
 	nextPort  int
 }
 
@@ -162,6 +163,7 @@ func NewDemoDB() *DemoDB {
 				Enabled:         true,
 			},
 		},
+		plugins:  []database.Plugin{},
 		nextPort: 8204,
 	}
 }
@@ -248,6 +250,49 @@ func (d *DemoDB) RenameRenderer(id, name string) error {
 	for i, r := range d.renderers {
 		if r.ID == id {
 			d.renderers[i].Name = name
+			return nil
+		}
+	}
+	return nil
+}
+
+// ListPlugins returns mock plugins.
+func (d *DemoDB) ListPlugins() ([]database.Plugin, error) {
+	return d.plugins, nil
+}
+
+// GetPlugin returns a mock plugin by ID.
+func (d *DemoDB) GetPlugin(id string) (*database.Plugin, error) {
+	for _, p := range d.plugins {
+		if p.ID == id {
+			return &p, nil
+		}
+	}
+	return nil, nil
+}
+
+// CreatePlugin creates a mock plugin.
+func (d *DemoDB) CreatePlugin(p *database.Plugin) error {
+	d.plugins = append(d.plugins, *p)
+	return nil
+}
+
+// UpdatePlugin updates a mock plugin.
+func (d *DemoDB) UpdatePlugin(p *database.Plugin) error {
+	for i, existing := range d.plugins {
+		if existing.ID == p.ID {
+			d.plugins[i] = *p
+			return nil
+		}
+	}
+	return nil
+}
+
+// DeletePlugin deletes a mock plugin.
+func (d *DemoDB) DeletePlugin(id string) error {
+	for i, p := range d.plugins {
+		if p.ID == id {
+			d.plugins = append(d.plugins[:i], d.plugins[i+1:]...)
 			return nil
 		}
 	}
