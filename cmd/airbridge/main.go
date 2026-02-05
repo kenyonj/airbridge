@@ -455,6 +455,7 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 
 	// Wire up state broadcasting from bridge to web clients BEFORE starting bridge
 	br.SetStateBroadcaster(webServer.BroadcastStateUpdate)
+	br.SetVolumeBroadcaster(webServer.BroadcastVolumeUpdate)
 
 	// Now start the bridge (which loads renderers with callbacks set)
 	if err := br.Start(ctx); err != nil {

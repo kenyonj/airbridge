@@ -164,6 +164,16 @@ func (s *Server) BroadcastRendererChange(rendererID, action string) {
 	})
 }
 
+// BroadcastVolumeUpdate notifies clients of a volume change.
+func (s *Server) BroadcastVolumeUpdate(rendererID string, volume int, muted bool) {
+	s.hub.Broadcast(WebSocketMessage{
+		Type:       "volume_update",
+		RendererID: rendererID,
+		Volume:     volume,
+		Muted:      muted,
+	})
+}
+
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Only handle exact /admin or /admin/ paths
 	if r.URL.Path != "/admin" && r.URL.Path != "/admin/" {
@@ -814,14 +824,14 @@ func (s *Server) renderPluginsList(w http.ResponseWriter) {
 		}
 	}
 
-	s.templates.ExecuteTemplate(w, "plugins_list.html", map[string]interface{}{
+	_ = s.templates.ExecuteTemplate(w, "plugins_list.html", map[string]interface{}{
 		"Plugins": views,
 	})
 }
 
 // handlePluginNew returns the new plugin form.
 func (s *Server) handlePluginNew(w http.ResponseWriter, r *http.Request) {
-	s.templates.ExecuteTemplate(w, "plugin_form.html", map[string]interface{}{
+	_ = s.templates.ExecuteTemplate(w, "plugin_form.html", map[string]interface{}{
 		"Plugin": nil,
 		"Config": map[string]string{},
 	})
@@ -837,7 +847,7 @@ func (s *Server) handlePluginTestConfig(w http.ResponseWriter, r *http.Request) 
 	var data map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "Invalid request body",
 		})
@@ -862,7 +872,7 @@ func (s *Server) handlePluginTestConfig(w http.ResponseWriter, r *http.Request) 
 		config["auth_pass"] = data["auth_pass"]
 	default:
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "Unknown plugin type",
 		})
@@ -880,7 +890,7 @@ func (s *Server) handlePluginTestConfig(w http.ResponseWriter, r *http.Request) 
 	})
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -893,7 +903,7 @@ func (s *Server) handlePluginTestConfig(w http.ResponseWriter, r *http.Request) 
 	// Test the connection
 	if err := instance.TestConnection(); err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -909,7 +919,7 @@ func (s *Server) handlePluginTestConfig(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"zones":   zones,
 	})
@@ -993,7 +1003,7 @@ func (s *Server) createPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create plugin instance in registry
-	s.plugins.CreateInstance(plugins.PluginConfig{
+	_, _ = s.plugins.CreateInstance(plugins.PluginConfig{
 		ID:      id,
 		Type:    pluginType,
 		Name:    name,
@@ -1015,9 +1025,9 @@ func (s *Server) editPlugin(w http.ResponseWriter, r *http.Request, pluginID str
 	}
 
 	var config map[string]string
-	json.Unmarshal([]byte(plugin.Config), &config)
+	_ = json.Unmarshal([]byte(plugin.Config), &config)
 
-	s.templates.ExecuteTemplate(w, "plugin_form.html", map[string]interface{}{
+	_ = s.templates.ExecuteTemplate(w, "plugin_form.html", map[string]interface{}{
 		"Plugin": plugin,
 		"Config": config,
 	})
@@ -1063,7 +1073,7 @@ func (s *Server) updatePlugin(w http.ResponseWriter, r *http.Request, pluginID s
 
 	// Recreate plugin instance with new config
 	s.plugins.RemoveInstance(pluginID)
-	s.plugins.CreateInstance(plugins.PluginConfig{
+	_, _ = s.plugins.CreateInstance(plugins.PluginConfig{
 		ID:      pluginID,
 		Type:    plugin.Type,
 		Name:    plugin.Name,
@@ -1084,7 +1094,7 @@ func (s *Server) deletePlugin(w http.ResponseWriter, r *http.Request, pluginID s
 	}
 
 	s.plugins.RemoveInstance(pluginID)
-	s.db.DeletePlugin(pluginID)
+	_ = s.db.DeletePlugin(pluginID)
 
 	// Return updated plugin list
 	s.renderPluginsList(w)
@@ -1101,7 +1111,7 @@ func (s *Server) testPlugin(w http.ResponseWriter, r *http.Request, pluginID str
 		}
 
 		var config map[string]string
-		json.Unmarshal([]byte(plugin.Config), &config)
+		_ = json.Unmarshal([]byte(plugin.Config), &config)
 
 		instance, err = s.plugins.CreateInstance(plugins.PluginConfig{
 			ID:      pluginID,
@@ -1137,12 +1147,12 @@ func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginI
 		if err != nil || plugin == nil {
 			log.Printf("Plugin %s not found in DB: %v", pluginID, err)
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
+			_ = json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
 			return
 		}
 
 		var config map[string]string
-		json.Unmarshal([]byte(plugin.Config), &config)
+		_ = json.Unmarshal([]byte(plugin.Config), &config)
 		log.Printf("Creating plugin instance from DB: type=%s, config=%v", plugin.Type, config)
 
 		instance, err = s.plugins.CreateInstance(plugins.PluginConfig{
@@ -1155,7 +1165,7 @@ func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginI
 		if err != nil {
 			log.Printf("Failed to create plugin instance: %v", err)
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
+			_ = json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
 			return
 		}
 	} else {
@@ -1166,13 +1176,13 @@ func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginI
 	if err != nil {
 		log.Printf("Failed to list devices for plugin %s: %v", pluginID, err)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
+		_ = json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
 		return
 	}
 
 	log.Printf("Found %d zones for plugin %s", len(devices), pluginID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(devices)
+	_ = json.NewEncoder(w).Encode(devices)
 }
 
 // handleJukeWebhook handles incoming webhooks from Juke Audio devices.

@@ -17,11 +17,13 @@ var upgrader = websocket.Upgrader{
 
 // WebSocketMessage represents a message sent over WebSocket.
 type WebSocketMessage struct {
-	Type           string `json:"type"` // "state_update", "renderer_changed", etc.
+	Type           string `json:"type"` // "state_update", "renderer_changed", "volume_update", etc.
 	RendererID     string `json:"renderer_id,omitempty"`
 	TransportState string `json:"transport_state,omitempty"`
 	Running        bool   `json:"running,omitempty"`
 	Action         string `json:"action,omitempty"` // "created", "deleted", "updated"
+	Volume         int    `json:"volume,omitempty"`
+	Muted          bool   `json:"muted,omitempty"`
 }
 
 // StateUpdate is an alias for backward compatibility.

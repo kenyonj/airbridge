@@ -44,6 +44,9 @@ type RendererInstance struct {
 // StateBroadcaster is called when renderer state changes.
 type StateBroadcaster func(rendererID, transportState string, running bool)
 
+// VolumeBroadcaster is called when renderer volume changes from external source.
+type VolumeBroadcaster func(rendererID string, volume int, muted bool)
+
 // Bridge is a unified DLNA bridge with multiple embedded renderers.
 type Bridge struct {
 	db        *database.DB
@@ -63,7 +66,8 @@ type Bridge struct {
 	cancel context.CancelFunc
 
 	// Callback for broadcasting state changes to web UI
-	onStateChange StateBroadcaster
+	onStateChange  StateBroadcaster
+	onVolumeChange VolumeBroadcaster
 }
 
 // NewBridge creates a new unified bridge.
@@ -83,6 +87,13 @@ func (b *Bridge) SetStateBroadcaster(cb StateBroadcaster) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.onStateChange = cb
+}
+
+// SetVolumeBroadcaster sets the callback for volume changes.
+func (b *Bridge) SetVolumeBroadcaster(cb VolumeBroadcaster) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.onVolumeChange = cb
 }
 
 // SetPluginRegistry sets the plugin registry for volume control.
@@ -401,6 +412,7 @@ func (b *Bridge) UpdateVolumeFromPlugin(pluginID, deviceID string, volume int, m
 		if dbRenderer.VolumePluginID == pluginID && dbRenderer.VolumeDeviceID == deviceID {
 			b.mu.RLock()
 			inst, ok := b.renderers[dbRenderer.ID]
+			volumeCb := b.onVolumeChange
 			b.mu.RUnlock()
 
 			if ok && inst.State != nil && inst.EventManager != nil {
@@ -408,6 +420,11 @@ func (b *Bridge) UpdateVolumeFromPlugin(pluginID, deviceID string, volume int, m
 				inst.State.SetVolume(volume)
 				inst.State.SetMute(muted)
 				inst.EventManager.NotifyVolume(volume, muted)
+
+				// Broadcast to web UI
+				if volumeCb != nil {
+					volumeCb(dbRenderer.ID, volume, muted)
+				}
 			}
 		}
 	}
