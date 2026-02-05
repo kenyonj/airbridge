@@ -732,6 +732,7 @@ func (b *Bridge) handleRendererRequest(w http.ResponseWriter, r *http.Request) {
 
 // handleRendererDeviceXML returns a standalone device description for a single renderer.
 func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request, renderer *RendererInstance) {
+	log.Printf("Serving device.xml for renderer: ID=%s Name=%s AirPlayName=%s", renderer.ID, renderer.Name, renderer.AirPlayName)
 	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, b.port)
 	xml := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <root xmlns="urn:schemas-upnp-org:device-1-0">

@@ -4,6 +4,7 @@ package ssdp
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
 	"strings"
@@ -192,6 +193,8 @@ func SearchResponderWithLocation(ctx context.Context, baseURL, locationPath, dev
 		if st != deviceUUID && st != "ssdp:all" {
 			usn = deviceUUID + "::" + st
 		}
+
+		log.Printf("SSDP M-SEARCH response: ST=%s USN=%s Location=%s", st, usn, location)
 
 		resp := fmt.Sprintf(
 			"HTTP/1.1 200 OK\r\n"+
