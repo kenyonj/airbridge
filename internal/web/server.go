@@ -1093,11 +1093,15 @@ func (s *Server) testPlugin(w http.ResponseWriter, r *http.Request, pluginID str
 }
 
 func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginID string) {
+	log.Printf("Fetching zones for plugin: %s", pluginID)
+	
 	instance, ok := s.plugins.GetInstance(pluginID)
 	if !ok {
+		log.Printf("Plugin %s not in registry, loading from DB", pluginID)
 		// Try to create instance from DB
 		plugin, err := s.db.GetPlugin(pluginID)
 		if err != nil || plugin == nil {
+			log.Printf("Plugin %s not found in DB: %v", pluginID, err)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
 			return
@@ -1105,6 +1109,7 @@ func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginI
 
 		var config map[string]string
 		json.Unmarshal([]byte(plugin.Config), &config)
+		log.Printf("Creating plugin instance from DB: type=%s, config=%v", plugin.Type, config)
 
 		instance, err = s.plugins.CreateInstance(plugins.PluginConfig{
 			ID:      pluginID,
@@ -1114,19 +1119,24 @@ func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginI
 			Enabled: plugin.Enabled,
 		})
 		if err != nil {
+			log.Printf("Failed to create plugin instance: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
 			return
 		}
+	} else {
+		log.Printf("Plugin %s found in registry", pluginID)
 	}
 
 	devices, err := instance.ListDevices()
 	if err != nil {
+		log.Printf("Failed to list devices for plugin %s: %v", pluginID, err)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode([]plugins.VolumeDevice{})
 		return
 	}
 
+	log.Printf("Found %d zones for plugin %s", len(devices), pluginID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(devices)
 }

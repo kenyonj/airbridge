@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -63,21 +64,22 @@ func (p *Plugin) TestConnection() error {
 	return err
 }
 
-// Zone represents a Juke Audio zone.
-type Zone struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Volume int    `json:"volume"`
-}
-
-// ZonesResponse wraps the zones array if the API returns an object.
-type ZonesResponse struct {
-	Zones []Zone `json:"zones"`
+// ZoneInfo represents a Juke Audio zone from /api/v3/zones/info endpoint.
+// See API docs: https://sim.jukeaudio.com/api/v3/apidocs/
+type ZoneInfo struct {
+	ZoneID  string `json:"zone_id"`
+	Name    string `json:"name"`
+	Volume  int    `json:"volume"`
+	Enabled bool   `json:"enabled"`
+	Muted   bool   `json:"muted"`
 }
 
 // ListDevices returns all available zones from the Juke Audio system.
+// Uses /api/v3/zones/info to get all zone details in one call.
 func (p *Plugin) ListDevices() ([]plugins.VolumeDevice, error) {
-	req, err := http.NewRequest("GET", p.host+"/api/v3/zones", nil)
+	log.Printf("[Juke] ListDevices: host=%s, username=%s", p.host, p.username)
+
+	req, err := http.NewRequest("GET", p.host+"/api/v3/zones/info", nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -97,30 +99,34 @@ func (p *Plugin) ListDevices() ([]plugins.VolumeDevice, error) {
 		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Read body for flexible parsing
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
-	// Try to parse as direct array first
-	var zones []Zone
+	log.Printf("[Juke] API response (%d bytes): %s", len(body), string(body[:min(500, len(body))]))
+
+	// /api/v3/zones/info returns an array of ZoneInfo objects
+	var zones []ZoneInfo
 	if err := json.Unmarshal(body, &zones); err != nil {
-		// If that fails, try as wrapped object {"zones": [...]}
-		var wrapped ZonesResponse
-		if err := json.Unmarshal(body, &wrapped); err != nil {
-			return nil, fmt.Errorf("decode response: %w (body: %s)", err, string(body[:min(200, len(body))]))
-		}
-		zones = wrapped.Zones
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	devices := make([]plugins.VolumeDevice, len(zones))
-	for i, z := range zones {
-		devices[i] = plugins.VolumeDevice{
-			ID:   z.ID,
-			Name: z.Name,
+	log.Printf("[Juke] Found %d zones", len(zones))
+
+	devices := make([]plugins.VolumeDevice, 0, len(zones))
+	for _, z := range zones {
+		name := z.Name
+		if name == "" {
+			name = z.ZoneID
 		}
+		devices = append(devices, plugins.VolumeDevice{
+			ID:   z.ZoneID,
+			Name: name,
+		})
+		log.Printf("[Juke] Zone: id=%s, name=%s", z.ZoneID, name)
 	}
+
 	return devices, nil
 }
 
