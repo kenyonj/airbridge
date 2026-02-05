@@ -119,6 +119,12 @@ func (em *EventManager) NotifyTransportState(state string) {
 // NotifyVolume sends a NOTIFY for volume change.
 func (em *EventManager) NotifyVolume(volume int, mute bool) {
 	em.mu.RLock()
+	// Debug: log all subscriptions
+	log.Printf("EventManager has %d total subscriptions:", len(em.subscriptions))
+	for sid, sub := range em.subscriptions {
+		log.Printf("  - SID=%s service=%s callback=%s", sid, sub.ServiceID, sub.Callback)
+	}
+
 	subs := make([]*Subscription, 0)
 	for _, sub := range em.subscriptions {
 		if strings.Contains(sub.ServiceID, "renderingcontrol") {
