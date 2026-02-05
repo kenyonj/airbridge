@@ -31,6 +31,49 @@
         .animate-eq-5 { animation: eq-bar 0.8s ease-in-out infinite; animation-delay: 0.08s; }
         .animate-eq-6 { animation: eq-bar 0.65s ease-in-out infinite; animation-delay: 0.2s; }
         .animate-eq-7 { animation: eq-bar 0.75s ease-in-out infinite; animation-delay: 0.12s; }
+        
+        /* Modern volume slider */
+        .volume-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(to right, #8b5cf6 0%, #ec4899 var(--volume-pct, 50%), #e5e7eb var(--volume-pct, 50%), #e5e7eb 100%);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .volume-slider:hover {
+            height: 8px;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2), 0 0 0 2px #8b5cf6;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .volume-slider:hover::-webkit-slider-thumb {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 3px #8b5cf6;
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border: none;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2), 0 0 0 2px #8b5cf6;
+            cursor: pointer;
+        }
+        .volume-slider::-moz-range-track {
+            height: 6px;
+            border-radius: 3px;
+            background: #e5e7eb;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
