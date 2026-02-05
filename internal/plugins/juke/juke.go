@@ -239,11 +239,25 @@ func (p *Plugin) UnsubscribeWebhook(callbackURL string) error {
 
 // ParseWebhookPayload parses a Juke webhook payload and returns zone updates.
 // The Juke API posts an array of ZoneInfo objects when zones change.
+// Note: The payload may be double-encoded (a JSON string containing JSON).
 func ParseWebhookPayload(body []byte) ([]ZoneInfo, error) {
 	var zones []ZoneInfo
-	if err := json.Unmarshal(body, &zones); err != nil {
-		return nil, fmt.Errorf("parse webhook payload: %w", err)
+
+	// Try direct parsing first
+	if err := json.Unmarshal(body, &zones); err == nil {
+		return zones, nil
 	}
+
+	// Try parsing as double-encoded JSON (string containing JSON)
+	var jsonStr string
+	if err := json.Unmarshal(body, &jsonStr); err != nil {
+		return nil, fmt.Errorf("parse webhook payload: not valid JSON or JSON string")
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &zones); err != nil {
+		return nil, fmt.Errorf("parse webhook payload inner JSON: %w", err)
+	}
+
 	return zones, nil
 }
 
