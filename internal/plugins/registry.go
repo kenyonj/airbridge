@@ -90,3 +90,14 @@ func (r *Registry) ListInstances() []string {
 	}
 	return ids
 }
+
+// GetInstances returns a copy of all active plugin instances.
+func (r *Registry) GetInstances() map[string]VolumePlugin {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make(map[string]VolumePlugin, len(r.instances))
+	for id, p := range r.instances {
+		result[id] = p
+	}
+	return result
+}

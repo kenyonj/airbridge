@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kenyonj/airbridge/internal/plugins"
@@ -17,10 +18,12 @@ const PluginType = "juke_audio"
 
 // Plugin implements the Juke Audio volume control integration.
 type Plugin struct {
-	host     string
-	username string
-	password string
-	client   *http.Client
+	host        string
+	username    string
+	password    string
+	client      *http.Client
+	webhookURL  string
+	webhookLock sync.Mutex
 }
 
 // Config keys for Juke Audio plugin.
@@ -164,7 +167,90 @@ func (p *Plugin) SetVolume(deviceID string, volume int) error {
 	return nil
 }
 
+// SubscribeWebhook registers a webhook URL to receive zone change notifications.
+// Implements plugins.WebhookPlugin interface.
+func (p *Plugin) SubscribeWebhook(callbackURL string) error {
+	p.webhookLock.Lock()
+	defer p.webhookLock.Unlock()
+
+	log.Printf("[Juke] Subscribing webhook: %s", callbackURL)
+
+	body := fmt.Sprintf(`{"url": "%s"}`, callbackURL)
+	req, err := http.NewRequest("POST", p.host+"/api/v3/zones/subscribe", strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if p.username != "" {
+		req.SetBasicAuth(p.username, p.password)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	p.webhookURL = callbackURL
+	log.Printf("[Juke] Webhook subscribed successfully")
+	return nil
+}
+
+// UnsubscribeWebhook removes the webhook subscription.
+// Implements plugins.WebhookPlugin interface.
+func (p *Plugin) UnsubscribeWebhook(callbackURL string) error {
+	p.webhookLock.Lock()
+	defer p.webhookLock.Unlock()
+
+	log.Printf("[Juke] Unsubscribing webhook: %s", callbackURL)
+
+	body := fmt.Sprintf(`{"url": "%s"}`, callbackURL)
+	req, err := http.NewRequest("POST", p.host+"/api/v3/zones/unsubscribe", strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if p.username != "" {
+		req.SetBasicAuth(p.username, p.password)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	p.webhookURL = ""
+	log.Printf("[Juke] Webhook unsubscribed successfully")
+	return nil
+}
+
+// ParseWebhookPayload parses a Juke webhook payload and returns zone updates.
+// The Juke API posts an array of ZoneInfo objects when zones change.
+func ParseWebhookPayload(body []byte) ([]ZoneInfo, error) {
+	var zones []ZoneInfo
+	if err := json.Unmarshal(body, &zones); err != nil {
+		return nil, fmt.Errorf("parse webhook payload: %w", err)
+	}
+	return zones, nil
+}
+
 // Register registers the Juke Audio plugin factory with the registry.
 func Register(registry *plugins.Registry) {
 	registry.RegisterFactory(PluginType, New)
 }
+
+// Ensure Plugin implements WebhookPlugin interface
+var _ plugins.WebhookPlugin = (*Plugin)(nil)

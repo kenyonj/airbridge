@@ -45,115 +45,154 @@
             {{if .Renderers}}
             <div class="space-y-3" id="renderer-list">
                 {{range .Renderers}}
-                <div class="bg-gray-50 rounded-lg border {{if .Running}}border-green-300{{else if .Enabled}}border-yellow-200{{else}}border-gray-200{{end}}">
-                    <div class="flex items-center justify-between p-4">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-3 h-3 rounded-full {{if eq .TransportState "PLAYING"}}bg-blue-500 animate-pulse{{else if .Running}}bg-green-500{{else if .Enabled}}bg-yellow-500{{else}}bg-gray-400{{end}}"></div>
+                <div class="bg-gray-50 rounded-xl border {{if eq .TransportState "PLAYING"}}border-purple-300 bg-gradient-to-r from-purple-50 to-pink-50{{else if .Running}}border-green-300{{else if .Enabled}}border-yellow-200{{else}}border-gray-200{{end}} overflow-hidden">
+                    <div class="flex items-stretch">
+                        <!-- Large icon on left -->
+                        <div class="flex items-center justify-center w-20 {{if eq .TransportState "PLAYING"}}bg-gradient-to-br from-purple-500 to-pink-500{{else if .Running}}bg-gradient-to-br from-green-400 to-emerald-500{{else if .Enabled}}bg-gradient-to-br from-yellow-400 to-amber-500{{else}}bg-gray-300{{end}}">
                             {{if eq .DeviceType "chromecast"}}
-                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" title="Chromecast">
+                            <svg class="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3.29092 8C3.48057 6.81136 3.74029 5.97978 4.00001 5.77778C4.50001 5.38889 8.00001 5 12 5C16 5 19.5 5.38889 20 5.77778C20.5 6.16667 21 8.88889 21 12C21 15.1111 20.5 17.8333 20 18.2222C19.5857 18.5445 17.1116 18.8667 14 18.9677M3 11C5.03079 11.2259 6.92428 12.136 8.36911 13.5809C9.81395 15.0257 10.7241 16.9192 10.95 18.95M3 15.05C3.96089 15.246 4.84294 15.7202 5.53638 16.4136C6.22982 17.1071 6.70403 17.9891 6.9 18.95M3 18.95H3.01"/>
                             </svg>
                             {{else}}
-                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="AirPlay">
+                            <svg class="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 16L18 21H6L12 16Z"/>
                                 <path d="M3.99927 18C2.74389 16.3287 2 14.2512 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 14.2512 21.2561 16.3287 20.0007 18"/>
                                 <path d="M17.1228 15.1252C17.6793 14.215 18 13.1449 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 13.144 6.32014 14.2131 6.87572 15.1228"/>
-                                <path d="M14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12"/>
                             </svg>
                             {{end}}
-                            <div class="flex-1">
-                                <div class="font-medium text-gray-800">{{.Name}}</div>
-                                <div class="text-sm text-gray-500">→ {{.DeviceName}} (Port {{.Port}})</div>
-                                <div class="text-xs {{if eq .TransportState "PLAYING"}}text-blue-600{{else if .Running}}text-green-600{{else if .Enabled}}text-yellow-600{{else}}text-gray-400{{end}}">
-                                    {{if eq .TransportState "PLAYING"}}Playing{{else if eq .TransportState "PAUSED_PLAYBACK"}}Paused{{else if .Running}}Idle{{else if .Enabled}}Enabled (not running){{else}}Disabled{{end}}
+                        </div>
+                        
+                        <!-- Content -->
+                        <div class="flex-1 p-4">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="font-semibold text-gray-800">{{.Name}}</span>
+                                        {{if eq .TransportState "PLAYING"}}
+                                        <!-- Audio visualizer bars -->
+                                        <div class="flex items-end space-x-0.5 h-4">
+                                            <div class="w-1 bg-gradient-to-t from-purple-500 to-pink-400 rounded-full animate-eq-1"></div>
+                                            <div class="w-1 bg-gradient-to-t from-purple-500 to-pink-400 rounded-full animate-eq-2"></div>
+                                            <div class="w-1 bg-gradient-to-t from-pink-500 to-pink-300 rounded-full animate-eq-3"></div>
+                                            <div class="w-1 bg-gradient-to-t from-purple-500 to-pink-400 rounded-full animate-eq-4"></div>
+                                            <div class="w-1 bg-gradient-to-t from-purple-500 to-pink-400 rounded-full animate-eq-5"></div>
+                                            <div class="w-1 bg-gradient-to-t from-purple-600 to-purple-400 rounded-full animate-eq-6"></div>
+                                            <div class="w-1 bg-gradient-to-t from-purple-600 to-purple-400 rounded-full animate-eq-7"></div>
+                                        </div>
+                                        {{end}}
+                                    </div>
+                                    <div class="text-sm text-gray-500 mt-0.5">→ {{.DeviceName}}</div>
+                                    <div class="text-xs mt-1 {{if eq .TransportState "PLAYING"}}text-purple-600 font-medium{{else if .Running}}text-green-600{{else if .Enabled}}text-yellow-600{{else}}text-gray-400{{end}}">
+                                        {{if eq .TransportState "PLAYING"}}Now Playing{{else if eq .TransportState "PAUSED_PLAYBACK"}}Paused{{else if .Running}}Ready{{else if .Enabled}}Standby{{else}}Disabled{{end}}
+                                    </div>
                                 </div>
+                                
+                                <!-- Action buttons -->
+                                <div class="flex items-center space-x-1 ml-4">
+                                    {{if .Running}}
+                                    <button 
+                                        hx-post="/admin/renderers/{{.ID}}/stop"
+                                        hx-target="#renderer-section"
+                                        hx-swap="outerHTML"
+                                        class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Stop">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                                        </svg>
+                                    </button>
+                                    {{else if .Enabled}}
+                                    <button 
+                                        hx-post="/admin/renderers/{{.ID}}/start"
+                                        hx-target="#renderer-section"
+                                        hx-swap="outerHTML"
+                                        class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                        title="Start">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    </button>
+                                    {{end}}
+                                    <button 
+                                        hx-get="/admin/renderers/{{.ID}}/edit"
+                                        hx-target="#renderer-section"
+                                        hx-swap="innerHTML"
+                                        class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                        title="Settings">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                    </button>
+                                    <button 
+                                        hx-delete="/admin/renderers/{{.ID}}"
+                                        hx-target="#renderer-section"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Delete renderer '{{.Name}}'?"
+                                        class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Delete">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Bottom row: Volume + Protocol toggles -->
+                            <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+                                <!-- Volume slider -->
+                                {{if .Running}}
+                                <div class="flex items-center space-x-2">
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                                    </svg>
+                                    <input 
+                                        type="range" 
+                                        min="0" 
+                                        max="100" 
+                                        value="{{if ge .Volume 0}}{{.Volume}}{{else}}80{{end}}"
+                                        class="w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                        hx-post="/admin/renderers/{{.ID}}/volume"
+                                        hx-trigger="change"
+                                        hx-include="this"
+                                        hx-swap="none"
+                                        name="volume"
+                                        title="Volume: {{if ge .Volume 0}}{{.Volume}}{{else}}80{{end}}%">
+                                    <span class="text-xs text-gray-500 w-7">{{if ge .Volume 0}}{{.Volume}}{{else}}80{{end}}%</span>
+                                </div>
+                                {{else}}
+                                <div></div>
+                                {{end}}
+                                
                                 <!-- Protocol toggles -->
-                                <div class="mt-2 flex items-center space-x-2">
+                                <div class="flex items-center space-x-2">
                                     <button 
                                         hx-post="/admin/renderers/{{.ID}}/toggle"
                                         hx-target="#renderer-section"
                                         hx-swap="outerHTML"
-                                        class="px-2 py-1 text-xs rounded flex items-center space-x-1 {{if .Enabled}}bg-indigo-100 text-indigo-800 hover:bg-indigo-200{{else}}bg-gray-100 text-gray-600 hover:bg-gray-200{{end}}"
-                                        title="{{if .Enabled}}Disable DLNA renderer{{else}}Enable DLNA renderer{{end}}">
+                                        class="px-2 py-1 text-xs rounded-md flex items-center space-x-1 {{if .Enabled}}bg-indigo-100 text-indigo-700{{else}}bg-gray-100 text-gray-500{{end}} hover:opacity-80 transition-opacity"
+                                        title="{{if .Enabled}}Disable DLNA{{else}}Enable DLNA{{end}}">
                                         <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M23.255 12.667H13.02c-1.052 0-2.1.489-2.693 1.266v-.017a3.24 3.24 0 0 1-2.629 1.353 3.25 3.25 0 0 1 0-6.502c1.085 0 2.04.536 2.63 1.353v-.013c.591.776 1.64 1.273 2.692 1.273h10.129c.186-.005.873-.095.848-.981-.884-5.086-5.88-8.987-11.923-8.987-3.722 0-7.048 1.48-9.263 3.803-.356.527.014.689.35.734H9.77c1.05 0 2.1-.498 2.692-1.277v.018a3.242 3.242 0 0 1 2.63-1.355 3.252 3.252 0 0 1 0 6.503 3.24 3.24 0 0 1-2.63-1.355v.019c-.592-.78-1.642-1.266-2.692-1.266H2.55l.028.003s-1.068-.06-1.719.859C.361 8.9 0 10.62 0 12.002c0 1.388.198 2.65.867 3.923.564.908 1.71.85 1.71.85l-.042.005h7.233c1.05 0 2.1-.49 2.692-1.268v.02a3.242 3.242 0 0 1 2.63-1.356 3.251 3.251 0 0 1 0 6.502 3.242 3.242 0 0 1-2.63-1.354v.018c-.592-.779-1.642-1.277-2.692-1.277H3.164c-.328.042-.698.198-.379.7 2.216 2.336 5.555 3.823 9.289 3.823 6.054 0 11.056-3.91 11.926-9.009-.004-.713-.489-.877-.745-.912"/>
                                         </svg>
-                                        <span>{{if .Enabled}}DLNA{{else}}DLNA{{end}}</span>
+                                        <span>DLNA</span>
                                     </button>
                                     <button 
                                         hx-post="/admin/renderers/{{.ID}}/toggle-cast"
                                         hx-target="#renderer-section"
                                         hx-swap="outerHTML"
-                                        class="px-2 py-1 text-xs rounded flex items-center space-x-1 {{if .CastEnabled}}bg-orange-100 text-orange-800 hover:bg-orange-200{{else}}bg-gray-100 text-gray-600 hover:bg-gray-200{{end}}"
-                                        title="Experimental: Cast receiver (may not work with all apps)">
+                                        class="px-2 py-1 text-xs rounded-md flex items-center space-x-1 {{if .CastEnabled}}bg-orange-100 text-orange-700{{else}}bg-gray-100 text-gray-500{{end}} hover:opacity-80 transition-opacity"
+                                        title="Cast receiver">
                                         <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M4 10V7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7V17C20 17.5523 19.5523 18 19 18H12M6 18C6 16.8954 5.10457 16 4 16M8 18C8 15.7909 6.20914 14 4 14M4 12C7.31371 12 10 14.6863 10 18"/>
+                                            <path d="M4 10V7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7V17C20 17.5523 19.5523 18 19 18H12M6 18C6 16.8954 5.10457 16 4 16M8 18C8 15.7909 6.20914 14 4 14M4 12C7.31371 12 10 14.6863 10 18"/>
                                         </svg>
                                         <span>Cast</span>
                                     </button>
                                 </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-2">
-                        {{if .Running}}
-                        <button 
-                            hx-post="/admin/renderers/{{.ID}}/stop"
-                            hx-target="#renderer-section"
-                            hx-swap="outerHTML"
-                            class="p-2 text-red-600 hover:bg-red-100 rounded"
-                            title="Stop">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
-                            </svg>
-                        </button>
-                        <button 
-                            hx-post="/admin/renderers/{{.ID}}/restart"
-                            hx-target="#renderer-section"
-                            hx-swap="outerHTML"
-                            class="p-2 text-blue-600 hover:bg-blue-100 rounded"
-                            title="Restart">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                            </svg>
-                        </button>
-                        {{else if .Enabled}}
-                        <button 
-                            hx-post="/admin/renderers/{{.ID}}/start"
-                            hx-target="#renderer-section"
-                            hx-swap="outerHTML"
-                            class="p-2 text-green-600 hover:bg-green-100 rounded"
-                            title="Start">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </button>
-                        {{end}}
-                        <button 
-                            hx-delete="/admin/renderers/{{.ID}}"
-                            hx-target="#renderer-section"
-                            hx-swap="outerHTML"
-                            hx-confirm="Delete renderer '{{.Name}}'?"
-                            class="p-2 text-red-600 hover:bg-red-100 rounded"
-                            title="Delete">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                        </button>
-                        <button 
-                            hx-get="/admin/renderers/{{.ID}}/edit"
-                            hx-target="#renderer-section"
-                            hx-swap="innerHTML"
-                            class="p-2 text-gray-500 hover:bg-gray-200 rounded"
-                            title="Settings">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
                 </div>
                 {{end}}
             </div>

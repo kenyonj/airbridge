@@ -355,6 +355,80 @@ func (b *Bridge) GetTransportState(id string) string {
 	return ""
 }
 
+// GetVolume returns the current volume (0-100) for a renderer, or -1 if not running.
+func (b *Bridge) GetVolume(id string) int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if r, ok := b.renderers[id]; ok && r.State != nil {
+		return r.State.GetVolume()
+	}
+	return -1
+}
+
+// SetVolume sets the volume for a renderer.
+func (b *Bridge) SetVolume(id string, volume int) error {
+	b.mu.RLock()
+	r, ok := b.renderers[id]
+	b.mu.RUnlock()
+
+	if !ok || r.State == nil {
+		return fmt.Errorf("renderer not running: %s", id)
+	}
+
+	r.State.SetVolume(volume)
+	if r.Player != nil {
+		if err := r.Player.SetVolume(context.Background(), volume); err != nil {
+			log.Printf("SetVolume error for %s: %v", id, err)
+		}
+	}
+	if r.EventManager != nil {
+		r.EventManager.NotifyVolume(volume, r.State.GetMute())
+	}
+	return nil
+}
+
+// UpdateVolumeFromPlugin handles volume updates from external plugin webhooks.
+// It finds renderers using the specified plugin/device and updates their volume state.
+func (b *Bridge) UpdateVolumeFromPlugin(pluginID, deviceID string, volume int, muted bool) {
+	// Look up renderers from database that use this plugin/device combo
+	renderers, err := b.db.ListRenderers()
+	if err != nil {
+		log.Printf("UpdateVolumeFromPlugin: failed to list renderers: %v", err)
+		return
+	}
+
+	for _, dbRenderer := range renderers {
+		if dbRenderer.VolumePluginID == pluginID && dbRenderer.VolumeDeviceID == deviceID {
+			b.mu.RLock()
+			inst, ok := b.renderers[dbRenderer.ID]
+			b.mu.RUnlock()
+
+			if ok && inst.State != nil && inst.EventManager != nil {
+				log.Printf("Updating volume from plugin: renderer=%s, volume=%d, muted=%v", dbRenderer.Name, volume, muted)
+				inst.State.SetVolume(volume)
+				inst.State.SetMute(muted)
+				inst.EventManager.NotifyVolume(volume, muted)
+			}
+		}
+	}
+}
+
+// GetRenderersByPlugin returns renderer IDs that use a specific plugin.
+func (b *Bridge) GetRenderersByPlugin(pluginID string) []string {
+	renderers, err := b.db.ListRenderers()
+	if err != nil {
+		return nil
+	}
+
+	var ids []string
+	for _, r := range renderers {
+		if r.VolumePluginID == pluginID && r.Enabled {
+			ids = append(ids, r.ID)
+		}
+	}
+	return ids
+}
+
 // StartRenderer starts a renderer by ID.
 func (b *Bridge) StartRenderer(id string) error {
 	renderer, err := b.db.GetRenderer(id)

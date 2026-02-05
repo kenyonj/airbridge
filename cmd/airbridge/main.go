@@ -489,6 +489,9 @@ func runWebServer(ctx context.Context, dbPath string, httpPort int) {
 		}
 	}()
 
+	// Subscribe webhooks for plugins that support them (after HTTP server starts)
+	go subscribePluginWebhooks(pluginRegistry, br.LocalIP(), httpPort)
+
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -527,5 +530,23 @@ func loadPluginsFromDB(db *database.DB, registry *plugins.Registry) {
 		}
 
 		fmt.Printf("Loaded plugin: %s (%s)\n", p.Name, p.Type)
+	}
+}
+
+// subscribePluginWebhooks subscribes to webhooks for plugins that support them.
+func subscribePluginWebhooks(registry *plugins.Registry, localIP string, httpPort int) {
+	// Give the HTTP server a moment to start
+	time.Sleep(500 * time.Millisecond)
+
+	for pluginID, instance := range registry.GetInstances() {
+		// Check if plugin supports webhooks
+		if webhookPlugin, ok := instance.(plugins.WebhookPlugin); ok {
+			callbackURL := fmt.Sprintf("http://%s:%d/webhook/juke/%s", localIP, httpPort, pluginID)
+			if err := webhookPlugin.SubscribeWebhook(callbackURL); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to subscribe webhook for plugin %s: %v\n", pluginID, err)
+			} else {
+				fmt.Printf("Subscribed webhook for plugin %s: %s\n", pluginID, callbackURL)
+			}
+		}
 	}
 }

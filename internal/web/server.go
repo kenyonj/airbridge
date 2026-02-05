@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -16,6 +17,7 @@ import (
 	"github.com/kenyonj/airbridge/internal/database"
 	"github.com/kenyonj/airbridge/internal/discovery"
 	"github.com/kenyonj/airbridge/internal/plugins"
+	"github.com/kenyonj/airbridge/internal/plugins/juke"
 )
 
 // Version is the current Airbridge version, displayed in the web UI.
@@ -80,6 +82,7 @@ type RendererView struct {
 	Running        bool
 	DLNAURL        string
 	TransportState string // "PLAYING", "STOPPED", "PAUSED_PLAYBACK", etc.
+	Volume         int    // Current volume (0-100), -1 if not running
 }
 
 // RendererController is the interface for managing renderer lifecycle.
@@ -93,9 +96,13 @@ type RendererController interface {
 	StopAll()
 	RestartAll()
 	GetTransportState(id string) string
+	GetVolume(id string) int
+	SetVolume(id string, volume int) error
 	EnableCastReceiver(id string, port int) error
 	DisableCastReceiver(id string)
 	IsCastReceiverEnabled(id string) bool
+	// Volume updates from external plugins
+	UpdateVolumeFromPlugin(pluginID, deviceID string, volume int, muted bool)
 }
 
 // NewServer creates a new web server.
@@ -134,6 +141,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/plugins/", s.handlePluginAction)
 	mux.HandleFunc("/admin/plugins/new", s.handlePluginNew)
 	mux.HandleFunc("/admin/ws", s.hub.HandleWebSocket)
+	// Webhook endpoints for external volume control plugins
+	mux.HandleFunc("/webhook/juke/", s.handleJukeWebhook)
 }
 
 // BroadcastStateUpdate sends a state update to all WebSocket clients.
@@ -182,6 +191,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			Running:        s.renderers.IsRunning(r.ID),
 			DLNAURL:        fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
 			TransportState: transportState,
+			Volume:         s.renderers.GetVolume(r.ID),
 		})
 	}
 
@@ -305,6 +315,8 @@ func (s *Server) handleRendererAction(w http.ResponseWriter, r *http.Request) {
 		s.stopRenderer(w, r, id)
 	case action == "restart" && r.Method == "POST":
 		s.restartRenderer(w, r, id)
+	case action == "volume" && r.Method == "POST":
+		s.setRendererVolume(w, r, id)
 	case action == "edit" && r.Method == "GET":
 		s.editRendererForm(w, r, id)
 	case action == "rename" && r.Method == "POST":
@@ -450,6 +462,7 @@ func (s *Server) listRenderers(w http.ResponseWriter, r *http.Request) {
 			Running:        s.renderers.IsRunning(r.ID),
 			DLNAURL:        fmt.Sprintf("http://%s:%d/renderer/%s/device.xml", localIP, s.basePort, r.ID),
 			TransportState: s.renderers.GetTransportState(r.ID),
+			Volume:         s.renderers.GetVolume(r.ID),
 		})
 	}
 
@@ -546,6 +559,26 @@ func (s *Server) restartRenderer(w http.ResponseWriter, r *http.Request, id stri
 	s.listRenderers(w, r)
 }
 
+func (s *Server) setRendererVolume(w http.ResponseWriter, r *http.Request, id string) {
+	_ = r.ParseForm()
+	volumeStr := r.FormValue("volume")
+	volume := 0
+	if _, err := fmt.Sscanf(volumeStr, "%d", &volume); err != nil {
+		http.Error(w, "Invalid volume", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.renderers.SetVolume(id, volume); err != nil {
+		log.Printf("Failed to set volume for %s: %v", id, err)
+	} else {
+		log.Printf("Set volume for %s: %d", id, volume)
+	}
+
+	// Return just the updated volume value for HTMX
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprintf(w, "%d", volume)
+}
+
 func (s *Server) editRendererForm(w http.ResponseWriter, r *http.Request, id string) {
 	renderer, err := s.db.GetRenderer(id)
 	if err != nil || renderer == nil {
@@ -568,6 +601,7 @@ func (s *Server) editRendererForm(w http.ResponseWriter, r *http.Request, id str
 		"Renderer": RendererView{
 			Renderer: *renderer,
 			Running:  s.renderers.IsRunning(id),
+			Volume:   s.renderers.GetVolume(id),
 		},
 		"Plugins": dbPlugins,
 		"Zones":   zones,
@@ -1139,6 +1173,52 @@ func (s *Server) listPluginZones(w http.ResponseWriter, r *http.Request, pluginI
 	log.Printf("Found %d zones for plugin %s", len(devices), pluginID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(devices)
+}
+
+// handleJukeWebhook handles incoming webhooks from Juke Audio devices.
+// Route: POST /webhook/juke/{plugin_id}
+func (s *Server) handleJukeWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract plugin ID from path: /webhook/juke/{plugin_id}
+	path := strings.TrimPrefix(r.URL.Path, "/webhook/juke/")
+	pluginID := strings.TrimSuffix(path, "/")
+	if pluginID == "" {
+		http.Error(w, "Plugin ID required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[Webhook] Received Juke webhook for plugin %s", pluginID)
+
+	// Read the body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("[Webhook] Error reading body: %v", err)
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("[Webhook] Juke payload: %s", string(body[:min(500, len(body))]))
+
+	// Parse the Juke webhook payload (array of ZoneInfo)
+	zones, err := juke.ParseWebhookPayload(body)
+	if err != nil {
+		log.Printf("[Webhook] Error parsing payload: %v", err)
+		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	// Update volume for each zone
+	for _, zone := range zones {
+		log.Printf("[Webhook] Zone update: id=%s, volume=%d, muted=%v", zone.ZoneID, zone.Volume, zone.Muted)
+		s.renderers.UpdateVolumeFromPlugin(pluginID, zone.ZoneID, zone.Volume, zone.Muted)
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // GetPluginRegistry returns the plugin registry for external use.

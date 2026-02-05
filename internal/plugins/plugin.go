@@ -24,6 +24,22 @@ type VolumePlugin interface {
 	SetVolume(deviceID string, volume int) error
 }
 
+// WebhookPlugin is an optional interface for plugins that support webhook subscriptions
+// for receiving real-time updates from external systems.
+type WebhookPlugin interface {
+	VolumePlugin
+
+	// SubscribeWebhook registers a webhook URL to receive volume change notifications.
+	// The callbackURL is where the external system should POST updates.
+	SubscribeWebhook(callbackURL string) error
+
+	// UnsubscribeWebhook removes the webhook subscription.
+	UnsubscribeWebhook(callbackURL string) error
+}
+
+// VolumeUpdateCallback is called when volume is updated from an external source.
+type VolumeUpdateCallback func(pluginID, deviceID string, volume int, muted bool)
+
 // PluginConfig holds the stored configuration for a plugin instance.
 type PluginConfig struct {
 	ID      string            `json:"id"`

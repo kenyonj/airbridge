@@ -79,6 +79,26 @@ func (d *DemoController) IsCastReceiverEnabled(id string) bool {
 	return false
 }
 
+// UpdateVolumeFromPlugin handles volume updates from plugins (no-op in demo mode).
+func (d *DemoController) UpdateVolumeFromPlugin(pluginID, deviceID string, volume int, muted bool) {
+	// No-op in demo mode
+}
+
+// GetVolume returns mock volume for demo mode.
+func (d *DemoController) GetVolume(id string) int {
+	// Return a random-ish volume based on ID
+	vol := 50
+	for _, c := range id {
+		vol = (vol + int(c)) % 101
+	}
+	return vol
+}
+
+// SetVolume is a no-op in demo mode.
+func (d *DemoController) SetVolume(id string, volume int) error {
+	return nil
+}
+
 // DemoDiscovery provides mock device discovery.
 type DemoDiscovery struct{}
 
