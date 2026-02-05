@@ -118,6 +118,7 @@ func (em *EventManager) NotifyVolume(volume int, mute bool) {
 	}
 	em.mu.RUnlock()
 
+	log.Printf("Found %d renderingcontrol subscriptions to notify for volume=%d, mute=%v", len(subs), volume, mute)
 	for _, sub := range subs {
 		em.sendNotify(sub, buildVolumeEvent(volume, mute))
 	}
