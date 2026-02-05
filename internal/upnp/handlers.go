@@ -183,6 +183,7 @@ func RenderingControlHandler(st *state.PlayerState, player Player) http.HandlerF
 
 		case "GetVolume":
 			v := st.GetVolume()
+			log.Printf("RenderingControl GetVolume: returning %d", v)
 			WriteSOAPResponse(w, RenderingType, "GetVolumeResponse",
 				fmt.Sprintf("<CurrentVolume>%d</CurrentVolume>", v))
 
@@ -202,6 +203,7 @@ func RenderingControlHandler(st *state.PlayerState, player Player) http.HandlerF
 			if m {
 				val = "1"
 			}
+			log.Printf("RenderingControl GetMute: returning %s", val)
 			WriteSOAPResponse(w, RenderingType, "GetMuteResponse",
 				fmt.Sprintf("<CurrentMute>%s</CurrentMute>", val))
 
