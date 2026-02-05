@@ -63,6 +63,15 @@ func (em *EventManager) Subscribe(r *http.Request, serviceID string) (sid string
 		_, _ = fmt.Sscanf(to, "Second-%d", &timeoutSec)
 	}
 
+	// Remove any existing subscriptions for the same service
+	// This handles re-subscriptions where the client gets a new callback port
+	for oldSID, oldSub := range em.subscriptions {
+		if oldSub.ServiceID == serviceID {
+			log.Printf("Removing old subscription: SID=%s (replaced by new subscription)", oldSID)
+			delete(em.subscriptions, oldSID)
+		}
+	}
+
 	// Generate globally unique SID
 	sid = generateSID()
 
