@@ -305,6 +305,12 @@ go test -race ./... # Run with race detection
 - Ensure port 8200+ is not blocked by firewall
 - Try: `curl http://localhost:8200/device.xml` to verify HTTP server
 
+### Unraid: Changing the default port
+When changing the default port in Unraid:
+1. Set the `AIRBRIDGE_PORT` environment variable to your desired port
+2. Expand **Advanced View** in the container settings
+3. Update the **WebUI** field to match the same port (e.g., `http://[IP]:[PORT:XXXX]/admin`)
+
 ## License
 
 MIT License - see [LICENSE](LICENSE)
