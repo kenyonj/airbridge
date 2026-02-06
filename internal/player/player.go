@@ -151,29 +151,35 @@ func (p *RAOPPlayer) Play(ctx context.Context, uri string, volume int) error {
 		}
 	}()
 
+	// Capture references for the goroutine (these may be replaced by stopInternal)
+	ffmpegCmd := p.ffmpeg
+	streamerRef := p.streamer
+
 	// Start streaming in a goroutine
 	go func() {
 		// Start the RAOP streamer - this starts cliraop and pipes ffmpegOut to it
-		if err := p.streamer.Start(playCtx, ffmpegOut); err != nil {
+		if err := streamerRef.Start(playCtx, ffmpegOut); err != nil {
 			if err != context.Canceled && err != io.EOF {
 				log.Printf("RAOP streaming error: %v", err)
 			}
 		}
 
 		// Wait for ffmpeg to finish (it will exit when input ends or context cancelled)
-		_ = p.ffmpeg.Wait()
+		_ = ffmpegCmd.Wait()
 		log.Printf("FFmpeg finished, waiting for cliraop to drain buffer...")
 
 		// Wait for cliraop to finish playing buffered audio
 		// This gives it time to play out remaining samples
-		_ = p.streamer.WaitForCompletion()
+		_ = streamerRef.WaitForCompletion()
 		log.Printf("Playback complete")
 
-		// Now clean up
+		// Now clean up - only nil out if still pointing to our references
 		p.mu.Lock()
-		p.cancel = nil
-		p.ffmpeg = nil
-		p.streamer = nil
+		if p.ffmpeg == ffmpegCmd {
+			p.cancel = nil
+			p.ffmpeg = nil
+			p.streamer = nil
+		}
 		p.mu.Unlock()
 	}()
 
