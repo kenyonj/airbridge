@@ -606,10 +606,7 @@ func (b *Bridge) startHTTPServer() error {
 	// Root device description (shows all embedded devices)
 	mux.HandleFunc("/device.xml", b.handleDeviceDescription)
 
-	// Per-renderer device descriptions (for SSDP discovery)
-	mux.HandleFunc("/renderer/", b.handleRendererRequest)
-
-	// Service descriptions (shared)
+	// Service descriptions (shared) - kept for legacy embedded device support
 	mux.HandleFunc("/upnp/service/avtransport.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
 		w.Header().Set("Cache-Control", "max-age=1800")
@@ -722,120 +719,6 @@ func (b *Bridge) generateDeviceXML(baseURL string) string {
     </deviceList>
   </device>
 </root>`, baseURL, rootUUID, embeddedDevices.String())
-}
-
-// handleRendererRequest routes requests to the appropriate renderer.
-func (b *Bridge) handleRendererRequest(w http.ResponseWriter, r *http.Request) {
-	// Parse /renderer/{uuid}/...
-	path := strings.TrimPrefix(r.URL.Path, "/renderer/")
-	parts := strings.SplitN(path, "/", 3)
-	if len(parts) < 2 {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
-		return
-	}
-
-	uuid := parts[0]
-	reqType := parts[1] // "device.xml", "control", or "event"
-
-	renderer := b.GetRenderer(uuid)
-	if renderer == nil {
-		http.Error(w, "Renderer not found", http.StatusNotFound)
-		return
-	}
-
-	switch reqType {
-	case "device.xml":
-		// Per-renderer device description (standalone, not embedded)
-		b.handleRendererDeviceXML(w, r, renderer)
-	case "control":
-		if len(parts) < 3 {
-			http.Error(w, "Missing service", http.StatusBadRequest)
-			return
-		}
-		b.handleControl(w, r, renderer, parts[2])
-	case "event":
-		if len(parts) < 3 {
-			http.Error(w, "Missing service", http.StatusBadRequest)
-			return
-		}
-		b.handleEvent(w, r, renderer, parts[2])
-	default:
-		http.Error(w, "Invalid request type", http.StatusBadRequest)
-	}
-}
-
-// handleRendererDeviceXML returns a standalone device description for a single renderer.
-func (b *Bridge) handleRendererDeviceXML(w http.ResponseWriter, r *http.Request, renderer *RendererInstance) {
-	log.Printf("Serving device.xml for renderer: ID=%s Name=%s AirPlayName=%s", renderer.ID, renderer.Name, renderer.AirPlayName)
-	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, b.port)
-	xml := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
-<root xmlns="urn:schemas-upnp-org:device-1-0">
-  <specVersion>
-    <major>1</major>
-    <minor>0</minor>
-  </specVersion>
-  <URLBase>%s</URLBase>
-  <device>
-    <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
-    <friendlyName>%s</friendlyName>
-    <manufacturer>Airbridge</manufacturer>
-    <modelName>Airbridge (%s)</modelName>
-    <modelDescription>DLNA to AirPlay Bridge</modelDescription>
-    <modelNumber>1.0</modelNumber>
-    <serialNumber>%s</serialNumber>
-    <UDN>uuid:%s</UDN>
-    <serviceList>
-      <service>
-        <serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
-        <serviceId>urn:upnp-org:serviceId:AVTransport</serviceId>
-        <SCPDURL>/upnp/service/avtransport.xml</SCPDURL>
-        <controlURL>/renderer/%s/control/avtransport</controlURL>
-        <eventSubURL>/renderer/%s/event/avtransport</eventSubURL>
-      </service>
-      <service>
-        <serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType>
-        <serviceId>urn:upnp-org:serviceId:RenderingControl</serviceId>
-        <SCPDURL>/upnp/service/renderingcontrol.xml</SCPDURL>
-        <controlURL>/renderer/%s/control/renderingcontrol</controlURL>
-        <eventSubURL>/renderer/%s/event/renderingcontrol</eventSubURL>
-      </service>
-      <service>
-        <serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType>
-        <serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId>
-        <SCPDURL>/upnp/service/connectionmanager.xml</SCPDURL>
-        <controlURL>/renderer/%s/control/connectionmanager</controlURL>
-        <eventSubURL>/renderer/%s/event/connectionmanager</eventSubURL>
-      </service>
-    </serviceList>
-  </device>
-</root>`, baseURL, renderer.Name, renderer.Name, renderer.ID, renderer.ID,
-		renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID, renderer.ID)
-
-	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-	w.Header().Set("Cache-Control", "max-age=1800")
-	_, _ = w.Write([]byte(xml))
-}
-
-// handleControl handles SOAP control requests.
-func (b *Bridge) handleControl(w http.ResponseWriter, r *http.Request, renderer *RendererInstance, service string) {
-	action := upnp.ParseSOAPAction(r.Header.Get("SOAPACTION"))
-	log.Printf("%s action=%s from=%s renderer=%s", service, action, r.RemoteAddr, renderer.Name)
-
-	switch service {
-	case "avtransport":
-		upnp.AVTransportHandler(renderer.State, renderer.Player, renderer.EventManager)(w, r)
-	case "renderingcontrol":
-		upnp.RenderingControlHandler(renderer.State, renderer.Player)(w, r)
-	case "connectionmanager":
-		upnp.ConnectionManagerHandler()(w, r)
-	default:
-		http.Error(w, "Unknown service", http.StatusBadRequest)
-	}
-}
-
-// handleEvent handles UPnP event subscriptions.
-func (b *Bridge) handleEvent(w http.ResponseWriter, r *http.Request, renderer *RendererInstance, service string) {
-	upnp.EventHandlerWithState(renderer.EventManager, service, renderer.State)(w, r)
 }
 
 func logMiddleware(next http.Handler) http.Handler {
