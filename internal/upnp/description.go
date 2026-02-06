@@ -15,9 +15,10 @@ func DeviceDescriptionXML(baseURL, deviceUUID, friendlyName, manufacturer string
     <deviceType>%s</deviceType>
     <friendlyName>%s</friendlyName>
     <manufacturer>%s</manufacturer>
-    <modelName>Airbridge</modelName>
+    <modelName>Airbridge (%s)</modelName>
     <modelDescription>DLNA to AirPlay Bridge</modelDescription>
     <modelNumber>1.0</modelNumber>
+    <serialNumber>%s</serialNumber>
     <UDN>uuid:%s</UDN>
     <serviceList>
       <service>
@@ -44,7 +45,7 @@ func DeviceDescriptionXML(baseURL, deviceUUID, friendlyName, manufacturer string
     </serviceList>
   </device>
 </root>`,
-		baseURL, DeviceType, friendlyName, manufacturer, deviceUUID,
+		baseURL, DeviceType, friendlyName, manufacturer, friendlyName, deviceUUID, deviceUUID,
 		AVTransportType, RenderingType, ConnectionType)
 }
 

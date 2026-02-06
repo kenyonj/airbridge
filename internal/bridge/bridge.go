@@ -15,6 +15,7 @@ import (
 	"github.com/kenyonj/airbridge/internal/cast"
 	"github.com/kenyonj/airbridge/internal/database"
 	"github.com/kenyonj/airbridge/internal/discovery"
+	"github.com/kenyonj/airbridge/internal/httpserver"
 	"github.com/kenyonj/airbridge/internal/player"
 	"github.com/kenyonj/airbridge/internal/plugins"
 	"github.com/kenyonj/airbridge/internal/ssdp"
@@ -34,9 +35,11 @@ type RendererInstance struct {
 	AirPlayName  string            // Legacy: for AirPlay devices
 	DeviceName   string            // Generic device name
 	Device       *discovery.Device // Target device
+	Port         int               // HTTP port for this renderer
 	State        *state.PlayerState
 	Player       upnp.Player // Generic player interface
 	EventManager *upnp.EventManager
+	server       *http.Server      // Per-renderer HTTP server
 	cancel       context.CancelFunc
 	ssdpCancel   context.CancelFunc // Cancels SSDP announcements for this renderer
 }
@@ -195,6 +198,7 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 		DeviceType:   r.DeviceType,
 		AirPlayName:  r.AirPlayName,
 		DeviceName:   r.DeviceName,
+		Port:         r.Port,
 		State:        state.New(ctx),
 		EventManager: upnp.NewEventManager(),
 		cancel:       cancel,
@@ -264,25 +268,48 @@ func (b *Bridge) addRenderer(r *database.Renderer) error {
 
 	b.renderers[r.ID] = inst
 
-	// Start SSDP announcements for this renderer
+	// Start per-renderer HTTP server
+	b.startRendererHTTPServer(inst)
+
+	// Start SSDP announcements for this renderer (using renderer's port)
 	b.startRendererSSDP(inst)
 
 	return nil
 }
 
+// startRendererHTTPServer starts a dedicated HTTP server for a renderer.
+func (b *Bridge) startRendererHTTPServer(r *RendererInstance) {
+	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, r.Port)
+	mux := http.NewServeMux()
+	httpserver.RegisterHTTP(mux, baseURL, r.ID, r.Name, "Airbridge", r.State, r.Player, r.EventManager)
+
+	r.server = &http.Server{
+		Addr:    fmt.Sprintf(":%d", r.Port),
+		Handler: httpserver.LogMiddleware(mux),
+	}
+
+	go func() {
+		log.Printf("Starting renderer HTTP server: %s on port %d", r.Name, r.Port)
+		if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("HTTP server error for %s: %v", r.Name, err)
+		}
+	}()
+}
+
 // startRendererSSDP starts SSDP announcements for a specific renderer.
 func (b *Bridge) startRendererSSDP(r *RendererInstance) {
-	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, b.port)
+	// Use the renderer's own port for SSDP Location
+	baseURL := fmt.Sprintf("http://%s:%d", b.localIP, r.Port)
 	serverName := "Airbridge/1.0"
 	uuid := "uuid:" + r.ID
-	locationPath := fmt.Sprintf("/renderer/%s/device.xml", r.ID)
 
 	ssdpCtx, ssdpCancel := context.WithCancel(b.ctx)
 	r.ssdpCancel = ssdpCancel
 
-	go ssdp.AnnounceWithLocation(ssdpCtx, baseURL, locationPath, uuid, serverName)
-	go ssdp.SearchResponderWithLocation(ssdpCtx, baseURL, locationPath, uuid, serverName)
-	log.Printf("Started SSDP announcements for renderer: %s", r.Name)
+	// Use simple /device.xml path since each renderer has its own HTTP server
+	go ssdp.Announce(ssdpCtx, baseURL, uuid, serverName)
+	go ssdp.SearchResponder(ssdpCtx, baseURL, uuid, serverName)
+	log.Printf("Started SSDP announcements for renderer: %s on port %d", r.Name, r.Port)
 }
 
 // RemoveRenderer removes a renderer instance.
@@ -303,6 +330,13 @@ func (b *Bridge) stopRenderer(r *RendererInstance) {
 	if r.ssdpCancel != nil {
 		r.ssdpCancel()
 		log.Printf("Stopped SSDP announcements for renderer: %s", r.Name)
+	}
+	// Shutdown per-renderer HTTP server
+	if r.server != nil {
+		if err := r.server.Shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down HTTP server for %s: %v", r.Name, err)
+		}
+		log.Printf("Stopped HTTP server for renderer: %s on port %d", r.Name, r.Port)
 	}
 	if r.cancel != nil {
 		r.cancel()
