@@ -29,6 +29,7 @@ type Streamer struct {
 	stdin       io.WriteCloser
 	mu          sync.Mutex
 	running     bool
+	done        chan struct{} // Signals when cmd.Wait() completes
 }
 
 // NewStreamer creates a new RAOP streamer.
@@ -144,6 +145,7 @@ func (s *Streamer) Start(ctx context.Context, audio io.Reader) error {
 	}
 
 	s.running = true
+	s.done = make(chan struct{})
 
 	// Pipe audio to cliraop
 	go func() {
@@ -151,11 +153,12 @@ func (s *Streamer) Start(ctx context.Context, audio io.Reader) error {
 		_, _ = io.Copy(stdin, audio)
 	}()
 
-	// Wait for command to finish in background
+	// Wait for command to finish in background (only place cmd.Wait is called)
 	go func() {
 		err := s.cmd.Wait()
 		s.mu.Lock()
 		s.running = false
+		close(s.done)
 		s.mu.Unlock()
 		if err != nil {
 			log.Printf("cliraop exited with error: %v", err)
@@ -185,18 +188,19 @@ func (s *Streamer) Stop() error {
 	return s.cmd.Process.Kill()
 }
 
-// WaitForCompletion waits for cliraop to finish playing (with timeout).
+// WaitForCompletion waits for cliraop to finish playing.
 func (s *Streamer) WaitForCompletion() error {
 	s.mu.Lock()
-	cmd := s.cmd
+	done := s.done
 	s.mu.Unlock()
 
-	if cmd == nil {
+	if done == nil {
 		return nil
 	}
 
-	// Wait for cliraop to finish (it will exit after draining its buffer)
-	return cmd.Wait()
+	// Wait for the background goroutine to complete (which calls cmd.Wait)
+	<-done
+	return nil
 }
 
 // SetVolume adjusts the volume (note: requires restart with cliraop).
