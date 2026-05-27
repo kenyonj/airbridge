@@ -1,5 +1,5 @@
 name: Airbridge
-version: "0.2.2"
+version: "0.2.3"
 slug: airbridge
 description: Bridge DLNA/UPnP audio streams to AirPlay devices
 url: https://github.com/kenyonj/airbridge
@@ -7,6 +7,7 @@ arch:
   - amd64
 startup: application
 boot: auto
+init: false
 host_network: true
 ports:
   8200/tcp: 8200
