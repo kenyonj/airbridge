@@ -6,6 +6,7 @@ url: https://github.com/kenyonj/airbridge
 arch:
   - amd64
 startup: application
+init: false
 boot: auto
 host_network: true
 ports:
